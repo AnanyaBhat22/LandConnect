@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+app/src/dev/spikeConfig.ts
+docs/.spike-link.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+*.apk
+*.aab
+android/
+ios/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
