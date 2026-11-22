@@ -3,7 +3,6 @@
 .env.*
 !.env.example
 
-app/src/dev/spikeConfig.ts
 docs/.spike-link.txt
 
 # Python

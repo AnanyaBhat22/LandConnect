@@ -67,3 +67,11 @@ Each entry records a technical decision when it was made: the context, what we c
   - The LiveKit room and tokens are only created once the callee accepts, so a rejected or missed call never opens a media room.
   - In-memory state keeps the code simple for a single server instance.
 - **Trade-off:** Incoming calls only ring while the callee's app has a live socket (foreground or recently backgrounded). Ringing a killed app needs push notifications plus Android's native call UI, a documented stretch goal.
+
+## D10: Expo Router and an app-wide call overlay
+- **Date:** 22 Nov 2026
+- **Decision:** Use Expo Router (file-based, built on React Navigation) instead of hand-wiring React Navigation. Calls are a global state machine plus an overlay rendered above the navigator, not a route.
+- **Why:**
+  - Expo Router is Expo's recommended navigation for SDK 58, and `Stack.Protected` makes auth gating declarative.
+  - An incoming call must appear on whatever screen the user is on and must not be lost on back-navigation; an overlay driven by global state guarantees that.
+- **Trade-off:** The call screen isn't deep-linkable. That's irrelevant for calls.

@@ -1,7 +1,7 @@
 """Own profile, privacy settings, public profiles and blocking."""
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,25 @@ def update_me(body: UserUpdate, user: User = Depends(get_current_user), db: Sess
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.get("", response_model=list[UserPublic])
+def search_users(
+    q: str = Query(min_length=2, max_length=80, description="Part of a name"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[User]:
+    """Find people by name to chat with or call. Returns public profiles only,
+    leaves out yourself and anyone who has blocked you, and caps the result
+    size so the endpoint can't be used to dump the whole user list."""
+    blocked_me = select(Block.blocker_id).where(Block.blocked_id == user.id)
+    stmt = (
+        select(User)
+        .where(User.name.ilike(f"%{q.strip()}%"), User.id != user.id, User.id.not_in(blocked_me))
+        .order_by(User.name)
+        .limit(20)
+    )
+    return list(db.scalars(stmt))
 
 
 @router.get("/blocked", response_model=list[UserPublic])

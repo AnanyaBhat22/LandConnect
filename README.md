@@ -34,5 +34,24 @@ Interactive API docs: http://localhost:8000/docs. Realtime (chat and call signal
 
 Run the tests: `.\.venv\Scripts\python -m pytest -q`
 
-### App
-_Coming soon._
+### Demo accounts
+Run `.\.venv\Scripts\python -m scripts.seed_demo` once. All demo accounts use the password **demo1234**:
+`asha@example.com` (Buyer), `ravi@example.com` (Seller), `meera@example.com` (Broker).
+
+### App (Expo dev build)
+```powershell
+cd app
+npm install
+Copy-Item .env.example .env      # set EXPO_PUBLIC_API_URL to your laptop's Wi-Fi IP
+npx expo start --dev-client
+```
+Install the development build APK on the phone, then connect it to the dev server shown by Expo.
+
+### Testing calls with one phone
+The laptop can act as the second person:
+```powershell
+cd server
+.\.venv\Scripts\python -m scripts.test_peer --mode accept    # answers calls from the phone
+.\.venv\Scripts\python -m scripts.test_peer --call Asha        # calls the phone user
+```
+When a call connects, it prints a LiveKit Meet link. Open it in the laptop browser to see and hear the phone.

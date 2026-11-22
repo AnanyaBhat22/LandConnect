@@ -108,3 +108,15 @@ def test_block_and_unblock(client):
     assert client.post(f"/users/{a['user']['id']}/block", headers=auth_header(a)).status_code == 400
     assert client.delete(f"/users/{b_id}/block", headers=auth_header(a)).status_code == 204
     assert client.get("/users/blocked", headers=auth_header(a)).json() == []
+
+
+def test_user_search(client):
+    me = register(client, email="me@example.com")
+    for name, email in (("Ravi Kumar", "ravi@example.com"), ("Ravina S", "ravina@example.com"), ("Meera", "meera@example.com")):
+        client.post("/auth/register", json={"name": name, "email": email, "password": "secret123", "role": "SELLER"})
+    res = client.get("/users", params={"q": "rav"}, headers=auth_header(me))
+    assert res.status_code == 200
+    names = [u["name"] for u in res.json()]
+    assert names == ["Ravi Kumar", "Ravina S"]
+    assert all("email" not in u for u in res.json())
+    assert client.get("/users", params={"q": "r"}, headers=auth_header(me)).status_code == 422  # too short

@@ -78,3 +78,23 @@ One entry per step: **what** we did, **why**, **problems** we hit and **how** we
   - During a call, the socket can drop for up to 20 s without ending the call, because the media flows through LiveKit, not the socket.
 - **Tests (24 total, all passing):** 12 unit tests for `CallManager` (full flow with JWT claims checked, reject, cancel, timeout, offline, busy, blocked, privacy, self-call, disconnects) and 2 end-to-end tests that start a real uvicorn server and connect two real Socket.IO clients: auth refused without a valid token, plus invite → incoming → accept → both get tokens → end → both get "ended" → history shows it.
 - **Known limit:** active calls are kept in memory, so this needs a single server process. That's fine on Render's free tier. Scaling out would move call state to Redis and use Socket.IO's Redis adapter.
+
+### Step 7: App side: login, tabs and the full calling UI
+- **What:**
+  - Navigation: switched the entry to **Expo Router** (file-based routes in `app/src/app/`). `Stack.Protected` shows the auth screens or the main app depending on login state.
+  - Auth: `src/api/client.ts` adds the token to every request, refreshes it once on 401, and signs out if that fails. `src/api/tokenStore.ts` keeps tokens in `expo-secure-store` (Android Keystore). `src/auth/AuthContext.tsx` holds the signed-in user.
+  - Screens: login (with one-tap demo accounts), sign-up with a role picker (Buyer/Seller/Broker) and a privacy note, WhatsApp-style tabs (Chats and Community as placeholders, Calls history, Profile with privacy settings and logout), and a "New call" people search.
+  - Realtime: `src/realtime/SocketContext.tsx` keeps one authenticated Socket.IO connection. Its `auth` callback sends the latest token on every reconnect, and an "unauthorized" error triggers a refresh and reconnect.
+  - Calls: `src/calls/CallContext.tsx` is a state machine (idle → outgoing/incoming → active → ended). `src/calls/CallOverlay.tsx` draws the incoming, ringing, in-call and ended screens **above all navigation**, so a call can ring on any screen. The in-call screen has mute, camera on/off, flip camera, speaker/earpiece, a timer and end. The phone vibrates while ringing and the screen stays awake during calls.
+- **Server additions:**
+  - `GET /users?q=` searches by name, returns public profiles only, leaves out people who blocked you, and is capped at 20 results.
+  - `scripts/seed_demo.py` creates the 3 demo accounts.
+  - `scripts/test_peer.py` turns the laptop into a second participant (see below).
+- **Why a test peer script:** only one Android phone is available. The script logs in as Ravi, rings or answers like the app would (accept/reject/ignore, or places a call), and prints a LiveKit Meet link so the laptop browser joins the audio/video. That's how every call path gets tested with one device.
+- **Why a new dev build:** Expo Router, SecureStore, image picker, location, MapLibre and expo-font are native modules. They were all added now so this is the **last** dev rebuild for the remaining features.
+- **Problems / fixes:**
+  - `npm` refused `@expo/vector-icons` because of a `react-dom` peer conflict (react-dom 19.3.1 wants react 19.3.0's next patch; react-dom isn't used on mobile). Fixed with `legacy-peer-deps=true` in `app/.npmrc`, which also makes `npm ci` on EAS work.
+  - `expo-doctor` flagged `expo-font` as a missing native peer of the icon set. Installed it before building, avoiding a likely crash.
+  - Race condition: pressing End while the invite is still in flight. The app now cancels the call as soon as the server returns its ID.
+  - TypeScript caught a stale narrowed type on a ref read after an `await`; fixed by re-reading the ref.
+- **Checks:** `tsc --noEmit` clean, `expo-doctor` 20/20, server tests 25/25.

@@ -52,7 +52,12 @@
           "cameraPermission": "LandConnect uses the camera for video calls.",
           "microphonePermission": "LandConnect uses the microphone for audio and video calls."
         }
-      ]
+      ],
+      "expo-router",
+      "expo-secure-store",
+      "expo-image",
+      "@maplibre/maplibre-react-native",
+      "expo-font"
     ],
     "extra": {
       "eas": {
