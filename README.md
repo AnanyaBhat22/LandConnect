@@ -28,9 +28,9 @@ python -m venv .venv
 Copy-Item .env.example .env      # then fill in your own keys
 .\.venv\Scripts\python -m scripts.check_services   # verifies Neon, LiveKit, Cloudinary
 .\.venv\Scripts\alembic upgrade head               # creates the database tables
-.\.venv\Scripts\uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+.\.venv\Scripts\uvicorn app.main:asgi --reload --host 0.0.0.0 --port 8000
 ```
-Interactive API docs: http://localhost:8000/docs
+Interactive API docs: http://localhost:8000/docs. Realtime (chat and call signalling) runs over Socket.IO on the same port.
 
 Run the tests: `.\.venv\Scripts\python -m pytest -q`
 

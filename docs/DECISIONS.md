@@ -55,3 +55,15 @@ Each entry records a technical decision when it was made: the context, what we c
 - **Decision:** pytest uses an in-memory SQLite database. Models use only portable types (`Uuid`, string-backed enums), and migrations target Postgres.
 - **Why:** Tests run offline in seconds and can never damage real data.
 - **Trade-off:** A Postgres-only bug wouldn't show up in tests, so a manual smoke test against Neon covers that gap.
+
+## D9: Call signalling design
+- **Date:** 22 Nov 2026
+- **Decision:**
+  - The ringing flow runs over our own Socket.IO server as request/acknowledgement events (`call:invite|accept|reject|end`, each returning `{ok, code, message}`) plus pushed events (`call:incoming|accepted|ended`).
+  - A single `call:ended` event carries the final status (COMPLETED, REJECTED, CANCELLED or MISSED), so the app has one place to close the call screen.
+  - Call state is held in memory and every state change is written to `call_logs`.
+- **Why:**
+  - Acknowledgements give the caller an immediate, specific answer (BUSY, OFFLINE, NOT_ALLOWED) instead of waiting for a timeout.
+  - The LiveKit room and tokens are only created once the callee accepts, so a rejected or missed call never opens a media room.
+  - In-memory state keeps the code simple for a single server instance.
+- **Trade-off:** Incoming calls only ring while the callee's app has a live socket (foreground or recently backgrounded). Ringing a killed app needs push notifications plus Android's native call UI, a documented stretch goal.

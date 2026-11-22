@@ -53,3 +53,28 @@ One entry per step: **what** we did, **why**, **problems** we hit and **how** we
   - The `.env` still had the placeholder `JWT_SECRET=change-me`, which would let anyone forge tokens. Replaced it with a random 64-character secret (never printed or committed).
   - The current Starlette `TestClient` needs the `httpx2` package; added to `requirements-dev.txt`.
   - The email validator rejects reserved domains like `.test`, so the smoke test used `example.com`.
+
+### Step 6: Call signalling (the key requirement, server side)
+- **What:**
+  - `app/services/calls.py` (`CallManager`): the call rules. Invite, accept, reject, end, a 30 s ring timeout, missed calls for offline users, busy detection, block and privacy checks, and a 20 s grace period for network blips.
+  - `app/realtime.py`: a Socket.IO server that authenticates with the same JWT, puts each user's devices in a private `user:<id>` room, and tracks presence.
+  - `app/services/livekit.py`: per-call tokens. One room per call, a separate token per participant, 2-hour expiry.
+  - `GET /calls`: history for the Calls tab, with direction, status, duration and the other person.
+- **Why the rules are separate from sockets:** the call rules are the part being evaluated, so they sit in a plain class that receives actions and returns events through an `emit` callback. That keeps them readable and lets tests drive every scenario in milliseconds without a phone.
+- **How each brief requirement maps to the code:**
+  - Initiate: `call:invite`
+  - Receive: `call:incoming` pushed to every device of the callee
+  - Accept or reject: `call:accept` / `call:reject`
+  - End: `call:end`
+  - No phone numbers: users are addressed by UUID, events carry only `UserPublic` (no email or phone), and LiveKit identities are UUIDs.
+- **Privacy and edge cases handled:**
+  - A block in either direction returns "unavailable", so the caller can't tell they're blocked.
+  - The "calls only from people I've chatted with" setting is enforced.
+  - Calling an offline user logs a missed call.
+  - A second caller gets BUSY.
+  - Only the callee can accept or reject.
+  - Ending a call twice gets a clear error, never a crash.
+  - If the callee's app disconnects while ringing, the caller sees "missed".
+  - During a call, the socket can drop for up to 20 s without ending the call, because the media flows through LiveKit, not the socket.
+- **Tests (24 total, all passing):** 12 unit tests for `CallManager` (full flow with JWT claims checked, reject, cancel, timeout, offline, busy, blocked, privacy, self-call, disconnects) and 2 end-to-end tests that start a real uvicorn server and connect two real Socket.IO clients: auth refused without a valid token, plus invite → incoming → accept → both get tokens → end → both get "ended" → history shows it.
+- **Known limit:** active calls are kept in memory, so this needs a single server process. That's fine on Render's free tier. Scaling out would move call state to Redis and use Socket.IO's Redis adapter.
