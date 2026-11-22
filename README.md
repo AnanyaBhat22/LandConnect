@@ -19,4 +19,20 @@ docs/     plan, decisions, dev log, architecture
 ```
 
 ## Setup
-_Coming soon: backend and app run instructions._
+
+### Backend (Python 3.11+)
+```powershell
+cd server
+python -m venv .venv
+.\.venv\Scripts\pip install -r requirements-dev.txt
+Copy-Item .env.example .env      # then fill in your own keys
+.\.venv\Scripts\python -m scripts.check_services   # verifies Neon, LiveKit, Cloudinary
+.\.venv\Scripts\alembic upgrade head               # creates the database tables
+.\.venv\Scripts\uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+Interactive API docs: http://localhost:8000/docs
+
+Run the tests: `.\.venv\Scripts\python -m pytest -q`
+
+### App
+_Coming soon._

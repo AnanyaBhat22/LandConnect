@@ -37,3 +37,21 @@ Each entry records a technical decision when it was made: the context, what we c
 - **Decision:** Neon (Postgres), Cloudinary (images), LiveKit Cloud (media), Expo/EAS (builds), Render (backend hosting), GitHub (code).
 - **Why:** There's no cost and no card details. Fallbacks if Render asks for a card: Koyeb's free tier, or a Cloudflare Tunnel from the laptop.
 - **Trade-off:** A free Render server sleeps after about 15 minutes idle, so the first request takes 30–60 seconds. This is documented in the README.
+
+## D6: Random UUID primary keys
+- **Date:** 22 Nov 2026
+- **Decision:** All tables use random UUIDs instead of auto-increment integers.
+- **Why:** IDs appear in URLs, chat and call signalling. Sequential IDs (`/users/1`, `/users/2`, ...) would let anyone enumerate every user and listing, which undermines the privacy requirement.
+- **Trade-off:** Slightly larger indexes, irrelevant at prototype scale.
+
+## D7: Stateless JWT access and refresh tokens
+- **Date:** 22 Nov 2026
+- **Decision:** A short-lived access token (60 min) plus a long-lived refresh token (14 days), both HS256 JWTs, stored on the phone in `expo-secure-store` (Android Keystore).
+- **Why:** No session table is needed, every request is verified with just the secret, and the same token authenticates the Socket.IO connection.
+- **Trade-off:** Tokens can't be revoked server-side before they expire; logout deletes them on the device. Production would add a refresh-token table with rotation.
+
+## D8: Tests on SQLite, app on Postgres
+- **Date:** 22 Nov 2026
+- **Decision:** pytest uses an in-memory SQLite database. Models use only portable types (`Uuid`, string-backed enums), and migrations target Postgres.
+- **Why:** Tests run offline in seconds and can never damage real data.
+- **Trade-off:** A Postgres-only bug wouldn't show up in tests, so a manual smoke test against Neon covers that gap.

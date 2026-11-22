@@ -32,3 +32,24 @@ One entry per step: **what** we did, **why**, **problems** we hit and **how** we
 - **Why it matters:** The riskiest part of the project (native WebRTC inside Expo, LiveKit connectivity, Android camera/mic permissions) is proven on day 0, so the rest of the plan builds on known-good ground.
 - **Problem / fix: "App not installed" on a Xiaomi phone.** The 224 MB dev-build APK parsed correctly (name and icon shown) but failed at install with a generic error. Ruled out: a damaged download (the package parsed), CPU type (the build includes armeabi-v7a, arm64-v8a, x86, x86_64), and minimum Android version (API 24 / Android 7). After allowing "Install unknown apps" for File Manager, a later retry succeeded. The exact cause is unconfirmed (likely storage or a Xiaomi install restriction). Lesson for reviewers: the final release APK will be much smaller than a dev build, and the README will include Xiaomi install tips.
 - **Problem / fix: Windows has several network adapters** (WSL, Hyper-V, Wi-Fi). Metro was reached through the Wi-Fi adapter's IP, entered manually in the dev client.
+
+### Step 5: Database schema and authentication (day 1 started early)
+- **What:**
+  - `app/db.py`: engine, sessions and a `get_db` dependency.
+  - `app/models.py`: all 10 tables (users, listings, listing_images, favorites, conversations, participants, messages, meeting_rooms, call_logs, blocks).
+  - Alembic: the initial migration was generated from the models and applied to Neon.
+  - `app/core/security.py`: bcrypt hashing plus JWT access and refresh tokens.
+  - `app/core/deps.py`: `get_current_user` and `require_role(...)`.
+  - `/auth/register`, `/auth/login`, `/auth/refresh`, `/users/me` (GET/PATCH), `/users/{id}`, block/unblock.
+- **Why this order:** every later feature (listings, chat, calls) needs to know *who* is asking and *what role* they have, so auth comes first.
+- **Security choices:**
+  - The same error for "unknown email" and "wrong password", so the login form doesn't reveal who has an account.
+  - Refresh tokens are rejected as access tokens and vice versa (a `type` claim).
+  - Passwords are 8–72 characters, because bcrypt ignores anything past 72 bytes.
+  - Users can't change their own role through PATCH `/users/me`.
+- **Privacy choice:** two response schemas. `UserMe` (your own profile) has email and phone. `UserPublic` (everyone else) has neither, so contact details can't leak through any endpoint.
+- **Tests:** 10 pytest tests on in-memory SQLite (about 4 s, offline), covering registration, login, token types, role checks (buyer → 403, seller/broker → 200), the privacy of public profiles, privacy settings and blocking. A smoke test against the real Neon database also passed (register → login → `/users/me`), and its test user was deleted afterwards.
+- **Problems / fixes:**
+  - The `.env` still had the placeholder `JWT_SECRET=change-me`, which would let anyone forge tokens. Replaced it with a random 64-character secret (never printed or committed).
+  - The current Starlette `TestClient` needs the `httpx2` package; added to `requirements-dev.txt`.
+  - The email validator rejects reserved domains like `.test`, so the smoke test used `example.com`.
