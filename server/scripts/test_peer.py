@@ -38,11 +38,16 @@ async def find_user(http: httpx.AsyncClient, name: str) -> dict:
 
 async def run(args: argparse.Namespace) -> None:
     http = httpx.AsyncClient(base_url=args.api, timeout=15)
-    res = await http.post("/auth/login", json={"email": args.email, "password": args.password})
-    res.raise_for_status()
-    auth = res.json()
+    async def login() -> dict:
+        # Fresh login = fresh access token (they expire after 60 min).
+        r = await http.post("/auth/login", json={"email": args.email, "password": args.password})
+        r.raise_for_status()
+        data = r.json()
+        http.headers["Authorization"] = f"Bearer {data['access_token']}"
+        return data
+
+    auth = await login()
     me = auth["user"]
-    http.headers["Authorization"] = f"Bearer {auth['access_token']}"
     print(f"Logged in as {me['name']} ({me['role']})")
 
     callee_id = None
@@ -51,7 +56,10 @@ async def run(args: argparse.Namespace) -> None:
         callee_id = person["id"]
         print(f"Will call {person['name']}")
 
-    sio = socketio.AsyncClient()
+    # Reconnection is handled below, not by the library: its built-in retry
+    # reuses the original token, which expires after 60 min, so after any
+    # network drop it got stuck retrying forever with a rejected token.
+    sio = socketio.AsyncClient(reconnection=False)
     done = asyncio.Event()
 
     # ---------- meetings: auto-join when invited, browser = laptop camera ----------
@@ -114,7 +122,29 @@ async def run(args: argparse.Namespace) -> None:
 
     # wait_timeout: Neon's free tier sleeps when idle and takes a few seconds to
     # wake; the client's 1 s default would give up before the auth check finishes.
-    await sio.connect(args.api, auth={"token": auth["access_token"]}, transports=["websocket"], wait_timeout=15)
+    async def connect() -> None:
+        await sio.connect(args.api, auth={"token": auth["access_token"]}, transports=["websocket"], wait_timeout=30)
+
+    @sio.event
+    async def disconnect(reason=None):
+        if done.is_set():
+            return
+        print(f"\n⚠  Disconnected ({reason}). Logging in again and reconnecting…")
+        asyncio.create_task(reconnect())
+
+    async def reconnect() -> None:
+        nonlocal auth
+        for attempt in range(1, 100):
+            await asyncio.sleep(min(2 * attempt, 15))
+            try:
+                auth = await login()
+                await connect()
+                print("   Reconnected.")
+                return
+            except Exception as e:  # noqa: BLE001 - keep trying, but say why
+                print(f"   attempt {attempt} failed: {type(e).__name__}: {e}")
+
+    await connect()
     print("Connected to realtime server. Auto-replying to chat messages. Ctrl+C to quit.")
 
     if args.chat:
@@ -132,7 +162,7 @@ async def run(args: argparse.Namespace) -> None:
         await done.wait()
         await sio.disconnect()
     else:
-        await sio.wait()
+        await asyncio.Event().wait()  # run until Ctrl+C; reconnect() keeps the socket alive
 
 
 def main() -> None:
