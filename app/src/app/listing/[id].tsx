@@ -4,9 +4,8 @@
  * ever shown). Owners get edit / mark sold / delete instead.
  */
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,12 +13,12 @@ import { api } from '../../api/client';
 import type { Listing } from '../../api/types';
 import { useCalls } from '../../calls/CallContext';
 import { ListingPhoto } from '../../components/ListingCard';
+import { PhotoGallery } from '../../components/PhotoGallery';
 import { MiniMap } from '../../components/LandMap';
 import { Avatar, Button, RoleBadge } from '../../components/ui';
 import { formatArea, formatPrice, pricePerSqft } from '../../lib/format';
 import { colors } from '../../theme';
 
-const WIDTH = Dimensions.get('window').width;
 
 function Fact({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
@@ -38,7 +37,6 @@ export default function ListingDetailScreen() {
   const insets = useSafeAreaInsets();
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [photo, setPhoto] = useState(0);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -121,24 +119,7 @@ export default function ListingDetailScreen() {
       />
       <ScrollView contentContainerStyle={{ paddingBottom: (listing.is_owner ? 32 : 110) + insets.bottom }}>
         {listing.images.length ? (
-          <View>
-            <FlatList
-              data={listing.images}
-              keyExtractor={(i) => i.id}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={(e) => setPhoto(Math.round(e.nativeEvent.contentOffset.x / WIDTH))}
-              renderItem={({ item }) => <Image source={{ uri: item.url }} style={{ width: WIDTH, height: 260 }} contentFit="cover" transition={200} />}
-            />
-            {listing.images.length > 1 && (
-              <View style={styles.dots}>
-                {listing.images.map((img, i) => (
-                  <View key={img.id} style={[styles.dot, i === photo && styles.dotActive]} />
-                ))}
-              </View>
-            )}
-          </View>
+          <PhotoGallery images={listing.images} />
         ) : (
           <ListingPhoto listing={listing} height={200} />
         )}
@@ -223,9 +204,6 @@ export default function ListingDetailScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  dots: { position: 'absolute', bottom: 10, alignSelf: 'center', flexDirection: 'row', gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.55)' },
-  dotActive: { backgroundColor: 'white', width: 18 },
   section: { paddingHorizontal: 18, paddingTop: 18, gap: 10 },
   statusPill: { alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   statusText: { color: 'white', fontSize: 12, fontWeight: '700' },

@@ -97,27 +97,46 @@ export async function api<T>(path: string, { method = 'GET', body, auth = true }
   return data as T;
 }
 
-/** Upload one photo as multipart/form-data (React Native's FormData accepts {uri, name, type}). */
-export async function uploadFile<T>(path: string, file: { uri: string; name: string; type: string }): Promise<T> {
-  const doFetch = () => {
+/**
+ * Upload one photo as multipart/form-data.
+ *
+ * Why XMLHttpRequest and not fetch: in Expo SDK 52+ the global `fetch` is
+ * Expo's WinterCG implementation, which rejects React Native-style file parts
+ * ({uri, name, type}) with "Unsupported FormDataPart implementation". RN's
+ * XMLHttpRequest still goes through the native networking module, which reads
+ * the file from its URI and streams it, so it handles phone photos correctly.
+ */
+function xhrUpload(url: string, file: { uri: string; name: string; type: string }): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
     const form = new FormData();
     form.append('file', file as any);
-    return fetch(`${API_URL}${path}`, {
-      method: 'POST',
-      headers: getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {},
-      body: form,
-    });
-  };
-  let res: Response;
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    const token = getAccessToken();
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.timeout = 60000;
+    xhr.onload = () => {
+      let body: any = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {}
+      resolve({ status: xhr.status, body });
+    };
+    xhr.onerror = () => reject(new Error('network error'));
+    xhr.ontimeout = () => reject(new Error('timed out'));
+    xhr.send(form);
+  });
+}
+
+export async function uploadFile<T>(path: string, file: { uri: string; name: string; type: string }): Promise<T> {
+  const url = `${API_URL}${path}`;
+  let res: { status: number; body: any };
   try {
-    res = await doFetch();
+    res = await xhrUpload(url, file);
+    if (res.status === 401 && (await refreshTokens())) res = await xhrUpload(url, file);
   } catch (e: any) {
-    // Keep the underlying reason (e.g. "Network request failed"): for uploads
-    // it's usually about the file, not the Wi-Fi.
     throw new ApiError(0, `Upload didn't reach the server (${e?.message ?? 'unknown error'})`);
   }
-  if (res.status === 401 && (await refreshTokens())) res = await doFetch();
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, errorMessage(data, res.status));
-  return data as T;
+  if (res.status < 200 || res.status >= 300) throw new ApiError(res.status, errorMessage(res.body, res.status));
+  return res.body as T;
 }
