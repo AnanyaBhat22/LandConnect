@@ -88,7 +88,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (!socket) return;
 
     const onIncoming = (d: { call_id: string; kind: CallKind; caller: UserPublic }) => {
-      if (stateRef.current.phase !== 'idle' && stateRef.current.phase !== 'ended') {
+      const current = stateRef.current;
+      // The server re-sends call:incoming after we reconnect; ignore it if it's
+      // the call already on screen.
+      if ('callId' in current && current.callId === d.call_id) return;
+      if (current.phase !== 'idle' && current.phase !== 'ended') {
         socket.emit('call:reject', { call_id: d.call_id }); // already on a call screen
         return;
       }

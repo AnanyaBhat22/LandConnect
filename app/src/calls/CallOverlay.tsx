@@ -2,7 +2,7 @@
  * Full-screen call UI drawn above all navigation, so a call can ring or
  * continue whatever screen the user is on. One component per call phase.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ import {
   useRemoteParticipants,
   useTracks,
 } from '@livekit/react-native';
-import { LocalVideoTrack, Track } from 'livekit-client';
+import { ConnectionError, LocalVideoTrack, Track } from 'livekit-client';
 
 import { Avatar, RoleBadge } from '../components/ui';
 import { colors } from '../theme';
@@ -95,9 +95,28 @@ function EndedView({ state }: { state: Extract<CallState, { phase: 'ended' }> })
   );
 }
 
+// Constant outside the component: LiveKitRoom compares options by value anyway,
+// but a stable object makes the intent obvious.
+const ROOM_OPTIONS = { adaptiveStream: { pixelDensity: 'screen' as const } };
+
 function ActiveView({ state }: { state: Extract<CallState, { phase: 'active' }> }) {
   const { hangup } = useCalls();
   useKeepAwake(); // don't let the screen sleep during a call
+
+  // IMPORTANT: LiveKitRoom re-runs its connect effect whenever `onError`
+  // changes identity. An inline arrow function (new every render) made it
+  // abort the half-finished connection on the first re-render, causing
+  // "The remote description was null". Keep the callback stable via a ref.
+  const hangupRef = useRef(hangup);
+  hangupRef.current = hangup;
+  const onError = useCallback((error: Error) => {
+    if (error instanceof ConnectionError) {
+      hangupRef.current(); // couldn't reach the media server: end the call cleanly
+    } else {
+      // Camera/mic publish problems shouldn't drop the whole call.
+      console.warn('Call media warning:', error.message);
+    }
+  }, []);
 
   // The audio session routes call audio correctly (echo cancellation, earpiece/speaker).
   useEffect(() => {
@@ -114,8 +133,8 @@ function ActiveView({ state }: { state: Extract<CallState, { phase: 'active' }> 
       connect
       audio
       video={state.kind === 'VIDEO'}
-      options={{ adaptiveStream: { pixelDensity: 'screen' } }}
-      onError={() => hangup()}
+      options={ROOM_OPTIONS}
+      onError={onError}
     >
       <ActiveCallUI state={state} />
     </LiveKitRoom>

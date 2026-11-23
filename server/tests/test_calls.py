@@ -223,11 +223,39 @@ def test_callee_disconnects_while_ringing(session_factory):
     alice, bob = make_user(session_factory, "Alice"), make_user(session_factory, "Bob")
 
     async def scenario():
-        mgr, em, online = setup(session_factory)
+        mgr, em, online = setup(session_factory, grace=0.1)
         online.update({alice, bob})
         await mgr.invite(alice, bob, CallKind.AUDIO)
         await mgr.user_offline(bob)
-        assert em.to(alice, "call:ended")[0]["status"] == "MISSED"
+        assert em.to(alice, "call:ended") == []  # still ringing during the grace period
+        await asyncio.sleep(0.25)
+        ended = em.to(alice, "call:ended")[0]
+        assert ended["status"] == "MISSED" and ended["reason"] == "disconnected"
+
+    asyncio.run(scenario())
+
+
+def test_callee_reconnects_while_ringing_gets_alert_again(session_factory):
+    """Phones drop their socket briefly (battery saving); the call must survive
+    and the incoming-call screen must reappear when they reconnect."""
+    alice, bob = make_user(session_factory, "Alice"), make_user(session_factory, "Bob")
+
+    async def scenario():
+        mgr, em, online = setup(session_factory, grace=0.1)
+        online.update({alice, bob})
+        call_id = (await mgr.invite(alice, bob, CallKind.VIDEO))["call_id"]
+        assert len(em.to(bob, "call:incoming")) == 1
+
+        await mgr.user_offline(bob)
+        await mgr.user_online(bob)
+        incoming = em.to(bob, "call:incoming")
+        assert len(incoming) == 2 and incoming[1]["call_id"] == call_id
+        assert incoming[1]["caller"]["name"] == "Alice"
+
+        await asyncio.sleep(0.25)  # past the grace period: call still alive
+        assert em.to(alice, "call:ended") == []
+        await mgr.reject(bob, uuid.UUID(call_id))
+        assert em.to(alice, "call:ended")[0]["status"] == "REJECTED"
 
     asyncio.run(scenario())
 

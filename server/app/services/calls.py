@@ -53,6 +53,7 @@ class ActiveCall:
     callee_id: uuid.UUID
     kind: CallKind
     status: CallStatus = CallStatus.RINGING
+    caller_public: dict[str, Any] | None = None  # kept to re-send call:incoming after a reconnect
     timer: asyncio.Task | None = field(default=None, repr=False)
 
     def other(self, user_id: uuid.UUID) -> uuid.UUID:
@@ -173,7 +174,7 @@ class CallManager:
             await self._db(lambda db: self._update_log(db, call_id, CallStatus.MISSED, ended=True))
             raise CallError("BUSY", "User is on another call")
 
-        call = ActiveCall(id=call_id, caller_id=caller_id, callee_id=callee_id, kind=kind)
+        call = ActiveCall(id=call_id, caller_id=caller_id, callee_id=callee_id, kind=kind, caller_public=caller_pub)
         self.calls[call.id] = call
         self.user_call[caller_id] = call.id
         self.user_call[callee_id] = call.id
@@ -241,23 +242,32 @@ class CallManager:
     # ---------- presence ----------
 
     async def user_offline(self, user_id: uuid.UUID) -> None:
-        """Called when a user's LAST socket disconnects."""
+        """Called when a user's LAST socket disconnects.
+
+        Phones drop their socket for a moment all the time (Wi-Fi handover,
+        Android battery saving), so we never end a call straight away. Instead
+        we start a grace timer and only finish the call if they don't return.
+        While ringing, the normal ring timeout still applies on top of this.
+        """
         call_id = self.user_call.get(user_id)
-        if call_id is None:
+        if call_id is None or user_id in self._grace_timers:
             return
-        call = self.calls[call_id]
-        if call.status == CallStatus.RINGING:
-            status = CallStatus.CANCELLED if user_id == call.caller_id else CallStatus.MISSED
-            await self._finish(call, status, "disconnected")
-        else:
-            # Media flows through LiveKit, not this socket, so a brief network
-            # blip shouldn't kill the call. End it only if they don't come back.
-            self._grace_timers[user_id] = asyncio.create_task(self._grace_end(user_id, call.id))
+        self._grace_timers[user_id] = asyncio.create_task(self._grace_end(user_id, call_id))
 
     async def user_online(self, user_id: uuid.UUID) -> None:
         task = self._grace_timers.pop(user_id, None)
         if task:
             task.cancel()
+        # If they're being called right now, the original call:incoming may
+        # have been lost while they were offline, so send it again.
+        call_id = self.user_call.get(user_id)
+        call = self.calls.get(call_id) if call_id else None
+        if call and call.status == CallStatus.RINGING and call.callee_id == user_id and call.caller_public:
+            await self.emit(
+                "call:incoming",
+                {"call_id": str(call.id), "kind": call.kind.value, "caller": call.caller_public},
+                user_id,
+            )
 
     # ---------- internals ----------
 
@@ -272,8 +282,13 @@ class CallManager:
         await asyncio.sleep(self.disconnect_grace)
         self._grace_timers.pop(user_id, None)
         call = self.calls.get(call_id)
-        if call:
-            await self._finish(call, CallStatus.COMPLETED, "disconnected")
+        if call is None:
+            return
+        if call.status == CallStatus.RINGING:
+            status = CallStatus.CANCELLED if user_id == call.caller_id else CallStatus.MISSED
+        else:
+            status = CallStatus.COMPLETED
+        await self._finish(call, status, "disconnected")
 
     def _cancel_timer(self, call: ActiveCall) -> None:
         if call.timer and call.timer is not asyncio.current_task():
@@ -295,6 +310,9 @@ class CallManager:
         for uid in (call.caller_id, call.callee_id):
             if self.user_call.get(uid) == call.id:
                 del self.user_call[uid]
+            grace = self._grace_timers.pop(uid, None)
+            if grace and grace is not asyncio.current_task():
+                grace.cancel()
         await self._db(lambda db: self._update_log(db, call.id, status, ended=True))
         payload = {"call_id": str(call.id), "status": status.value, "reason": reason}
         for uid in (call.caller_id, call.callee_id):
