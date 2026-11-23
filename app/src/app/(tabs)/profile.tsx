@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import type { CallPermission } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
@@ -37,6 +38,22 @@ export default function ProfileScreen() {
           <RoleBadge role={user.role} />
           <Text style={styles.muted}>{user.email}</Text>
         </View>
+      </View>
+
+      <Text style={styles.section}>Land</Text>
+      <View style={styles.group}>
+        {(user.role === 'SELLER' || user.role === 'BROKER') && (
+          <Pressable style={styles.row} onPress={() => router.push({ pathname: '/my-listings', params: { mode: 'mine' } })}>
+            <Ionicons name="home-outline" size={22} color={colors.textMuted} />
+            <Text style={[styles.rowTitle, { flex: 1 }]}>My listings</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+        )}
+        <Pressable style={styles.row} onPress={() => router.push({ pathname: '/my-listings', params: { mode: 'saved' } })}>
+          <Ionicons name="heart-outline" size={22} color={colors.textMuted} />
+          <Text style={[styles.rowTitle, { flex: 1 }]}>Saved land</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
       </View>
 
       <Text style={styles.section}>Privacy</Text>

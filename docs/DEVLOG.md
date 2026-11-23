@@ -125,3 +125,20 @@ One entry per step: **what** we did, **why**, **problems** we hit and **how** we
 - **In-call chat.** Messages typed in the browser's chat didn't reach the phone because the phone had no chat. Added `src/calls/InCallChat.tsx` using LiveKit's standard chat protocol (`useChat` over the room's data channel), so it interoperates with any LiveKit client in the room. It has a chat button with an unread badge, a slide-up panel with bubbles, and messages that exist only for the call (persistent conversations belong in the Chats tab).
 - **Own colour palette.** The first version copied WhatsApp's greens. The brief asks for a WhatsApp-*inspired* interface, so we kept the familiar layout (coloured header, tabs, call screens) but gave LandConnect an earthy brand: deep pine `#1F3B2F`, field green `#3E7C5A`, terracotta `#D9824B` and warm sand. All colours come from `src/theme.ts` tokens (`primary`, `secondary`, `accent`, `success`, `danger`), so the change touched one file plus a few direct usages. Accept and Decline stay green and red because those meanings are universal.
 - **Small fix:** `StyleSheet.absoluteFillObject` no longer exists in this React Native version (TypeScript caught it); replaced with explicit positioning.
+
+### Step 11: Land listings, maps and geotagging
+- **Server (`app/routers/listings.py`):**
+  - Browse with search (title/description/city), city and price filters, and pagination. The public feed shows only ACTIVE listings; "mine" shows all of a user's own.
+  - Create/edit/delete via `require_role(SELLER, BROKER)` plus an ownership check: another seller gets 403 on your listing.
+  - Photos upload to **our** server, which checks ownership, type (JPEG/PNG/WebP/HEIC), size (≤ 8 MB) and count (≤ 8), then forwards to Cloudinary (resized to ≤ 1600 px, auto format/quality). Cloudinary keys never ship in the app. Deleting a listing or photo also deletes it from Cloudinary.
+  - Favourites work for any role, and repeat saves are harmless (idempotent).
+  - **Location privacy:** with "Hide exact location", non-owners get coordinates rounded to 2 decimals (~1 km) and **no street address**. The exact point never leaves the server for them, so the app can't leak it. The owner always sees the exact spot.
+- **App:**
+  - **Community tab:** a feed of listing cards (photo, ₹ in lakh/crore, ₹/sq ft, area in sq ft or acres, city, owner role badge, save heart) with debounced search, and a **list/map toggle**. The map shows price pins (dashed when approximate) and a preview card when tapped.
+  - **Listing detail:** a swipeable photo gallery, key facts, a mini map (exact pin, or a ~1 km circle when approximate), description and owner card, with **Call / Video** buttons that start an in-app call to the owner. This links the marketplace to the key calling requirement, still without exposing phone numbers. Owners get Edit / Mark sold / Delete instead.
+  - **Create/edit form:** photos from the gallery or camera (up to 8, removable), details, a **location picker** where the pin stays centred and you move the map under it (easier with a finger than dragging a marker), a "use my location" GPS button, the phone's own reverse geocoder to pre-fill city/address, and a hide-exact-location toggle. The listing is saved first, then photos upload one by one, so a single failed photo doesn't lose the listing.
+  - **Profile:** "My listings" (sellers/brokers) and "Saved land" links.
+  - Maps use MapLibre + OpenFreeMap (no key, no card) with the OpenStreetMap attribution shown.
+- **Seed data:** 8 demo listings across Maharashtra (Lonavala, Pune, Nashik, Mahabaleshwar, Chakan, Karjat, Alibaug), 3 with hidden exact location. They start without photos, so the upload flow can be shown in the demo.
+- **No rebuild needed:** the location and image-picker native modules (and their Android permissions) were already in the last dev build.
+- **Checks:** 34 server tests (8 new: roles, ownership, filters, hidden location, photo rules, photo limit, favourites). `tsc` clean. A full `expo export` confirmed every screen compiles. In development Expo Router loads screens lazily, so the plain dev bundle doesn't include them.

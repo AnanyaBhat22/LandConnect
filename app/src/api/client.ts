@@ -96,3 +96,26 @@ export async function api<T>(path: string, { method = 'GET', body, auth = true }
   if (!res.ok) throw new ApiError(res.status, errorMessage(data, res.status));
   return data as T;
 }
+
+/** Upload one photo as multipart/form-data (React Native's FormData accepts {uri, name, type}). */
+export async function uploadFile<T>(path: string, file: { uri: string; name: string; type: string }): Promise<T> {
+  const doFetch = () => {
+    const form = new FormData();
+    form.append('file', file as any);
+    return fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {},
+      body: form,
+    });
+  };
+  let res: Response;
+  try {
+    res = await doFetch();
+  } catch {
+    throw new ApiError(0, `Can't reach the server at ${API_URL}. Check your Wi-Fi.`);
+  }
+  if (res.status === 401 && (await refreshTokens())) res = await doFetch();
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, errorMessage(data, res.status));
+  return data as T;
+}

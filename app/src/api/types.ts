@@ -37,3 +37,44 @@ export interface CallHistoryItem {
   created_at: string;
   duration_seconds: number | null;
 }
+
+export type ListingStatus = 'ACTIVE' | 'SOLD' | 'DRAFT';
+
+export interface ListingImage {
+  id: string;
+  url: string;
+  position: number;
+}
+
+export interface Listing {
+  id: string;
+  title: string;
+  description: string;
+  price_inr: number;
+  area_sqft: number | null;
+  latitude: number;
+  longitude: number;
+  address: string | null;
+  city: string | null;
+  hide_exact_location: boolean;
+  status: ListingStatus;
+  owner: UserPublic;
+  images: ListingImage[];
+  is_owner: boolean;
+  is_favorite: boolean;
+  location_is_approximate: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListingPage {
+  items: Listing[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export type ListingInput = Pick<
+  Listing,
+  'title' | 'description' | 'price_inr' | 'area_sqft' | 'latitude' | 'longitude' | 'address' | 'city' | 'hide_exact_location'
+>;

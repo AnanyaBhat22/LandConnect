@@ -40,6 +40,9 @@ function RootNavigator() {
         <Stack.Protected guard={signedIn} redirectTo="/login">
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="new-call" options={{ title: 'New call' }} />
+          <Stack.Screen name="listing/[id]" options={{ title: 'Listing' }} />
+          <Stack.Screen name="listing/edit" options={{ title: 'List your land' }} />
+          <Stack.Screen name="my-listings" options={{ title: 'My listings' }} />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn} redirectTo="/">
           <Stack.Screen name="login" options={{ headerShown: false }} />
