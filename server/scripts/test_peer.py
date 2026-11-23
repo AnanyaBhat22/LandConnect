@@ -16,6 +16,7 @@ Default identity: ravi@example.com / demo1234 (from scripts.seed_demo).
 """
 import argparse
 import asyncio
+import webbrowser
 from urllib.parse import urlencode
 
 import httpx
@@ -61,7 +62,13 @@ async def run(args: argparse.Namespace) -> None:
 
     @sio.on("call:accepted")
     async def on_accepted(data):
-        print(f"\n✅ Connected with {data['peer']['name']}. Join from the laptop browser:\n{meet_link(data['livekit_url'], data['token'])}\n")
+        link = meet_link(data["livekit_url"], data["token"])
+        print(f"\n✅ Connected with {data['peer']['name']}. Laptop browser link:\n{link}\n")
+        if not args.no_browser:
+            # This script only does signalling; the browser tab is the laptop's
+            # camera and mic. Without it, the phone is in a call with an empty room.
+            print("   Opening it in your browser (allow camera and microphone, then click Join)…")
+            webbrowser.open(link)
 
     @sio.on("call:ended")
     async def on_ended(data):
@@ -69,7 +76,9 @@ async def run(args: argparse.Namespace) -> None:
         if args.call:
             done.set()
 
-    await sio.connect(args.api, auth={"token": auth["access_token"]}, transports=["websocket"])
+    # wait_timeout: Neon's free tier sleeps when idle and takes a few seconds to
+    # wake; the client's 1 s default would give up before the auth check finishes.
+    await sio.connect(args.api, auth={"token": auth["access_token"]}, transports=["websocket"], wait_timeout=15)
     print("Connected to realtime server. Ctrl+C to quit.")
 
     if callee_id:
@@ -93,6 +102,7 @@ def main() -> None:
     p.add_argument("--delay", type=float, default=3.0, help="seconds to 'ring' before answering")
     p.add_argument("--call", help="name of a user to call instead of waiting")
     p.add_argument("--kind", choices=["AUDIO", "VIDEO"], default="VIDEO")
+    p.add_argument("--no-browser", action="store_true", help="print the call link instead of opening it")
     try:
         asyncio.run(run(p.parse_args()))
     except KeyboardInterrupt:

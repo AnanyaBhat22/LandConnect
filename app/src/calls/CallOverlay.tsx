@@ -14,6 +14,7 @@ import {
   isTrackReference,
   useConnectionState,
   useLocalParticipant,
+  useRemoteParticipants,
   useTracks,
 } from '@livekit/react-native';
 import { LocalVideoTrack, Track } from 'livekit-client';
@@ -159,7 +160,18 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
     }
   };
 
-  const status = connection === 'connected' ? (remote || !isVideo ? timer : 'Connecting video…') : 'Connecting…';
+  // "Accepted" (signalling) isn't the same as "joined" (media): show the timer
+  // only once the other person is actually in the LiveKit room.
+  const peerJoined = useRemoteParticipants().length > 0;
+  const firstName = state.peer.name.split(' ')[0];
+  const status =
+    connection !== 'connected'
+      ? 'Connecting…'
+      : !peerJoined
+        ? `Waiting for ${firstName} to join…`
+        : isVideo && !remoteVideo
+          ? `${timer} · ${firstName}'s camera is off`
+          : timer;
 
   return (
     <View style={styles.activeScreen}>

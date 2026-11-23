@@ -4,9 +4,9 @@ import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useAuth } from '../../auth/AuthContext';
-import { Button, TextField } from '../../components/ui';
-import { colors } from '../../theme';
+import { useAuth } from '../auth/AuthContext';
+import { Button, TextField } from '../components/ui';
+import { colors } from '../theme';
 
 const DEMO_ACCOUNTS = [
   { label: 'Buyer', email: 'asha@example.com' },

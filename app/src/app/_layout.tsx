@@ -36,12 +36,14 @@ function RootNavigator() {
           headerTitleStyle: { fontWeight: '600' },
         }}
       >
-        <Stack.Protected guard={signedIn}>
+        {/* Signed out: any app route (including the home "/") redirects to /login. */}
+        <Stack.Protected guard={signedIn} redirectTo="/login">
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="new-call" options={{ title: 'New call' }} />
         </Stack.Protected>
-        <Stack.Protected guard={!signedIn}>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Protected guard={!signedIn} redirectTo="/">
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="register" options={{ headerShown: false }} />
         </Stack.Protected>
       </Stack>
       <CallOverlay />

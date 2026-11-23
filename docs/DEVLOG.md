@@ -98,3 +98,13 @@ One entry per step: **what** we did, **why**, **problems** we hit and **how** we
   - Race condition: pressing End while the invite is still in flight. The app now cancels the call as soon as the server returns its ID.
   - TypeScript caught a stale narrowed type on a ref read after an `await`; fixed by re-reading the ref.
 - **Checks:** `tsc --noEmit` clean, `expo-doctor` 20/20, server tests 25/25.
+
+## 23 Nov 2026
+
+### Step 8: First real app-to-app video call ✅ (and four fixes found by testing on the phone)
+- **Result:** On the phone, Asha (Buyer) searched for Ravi, started a video call and the server rang the laptop peer. Ravi accepted, both sides got LiveKit tokens, the laptop browser joined, two-way video and audio worked, and the hang-up was recorded as COMPLETED in the call history. This is the key requirement working end to end in the real app.
+- **Fix 1: "Unmatched Route" on launch.** When signed out, the router opened `/`, which belongs to the protected tabs, and the auth screens sat in a group with no index route, so there was nothing to fall back to. Moved `login`/`register` to the top level (Expo's documented pattern) and added explicit `redirectTo` on both `Stack.Protected` guards.
+- **Fix 2: the laptop's Wi-Fi IP changed overnight** (192.168.29.207 → 192.168.0.143), so the app pointed at a dead address. In development, `src/config.ts` now derives the API host from `Constants.expoConfig.hostUri`, the address the phone loaded the app from. An IP change now only means typing the new address once in the dev client. `EXPO_PUBLIC_API_URL` overrides it for release builds.
+- **Fix 3: the test peer's socket connect timed out.** Neon's free tier sleeps when idle, so the first auth query takes a few seconds, while python-socketio's client gives up after 1 s. Raised `wait_timeout` to 15 s. (The phone's socket.io-client already waits 20 s.)
+- **Fix 4: "accepted" isn't the same as "joined".** The first test felt like nobody answered: the peer script accepted the call (signalling) but nothing joined the LiveKit room (media) until its browser link was opened. The script now opens the link automatically, and the phone shows "Waiting for Ravi to join…" (via `useRemoteParticipants`) until the other side is actually in the room, then starts the timer. If the peer's camera is off, it says so.
+- **Lesson:** the separation between signalling (our server) and media (LiveKit) is visible to users, so the UI has to reflect the media state, not just the signalling state.

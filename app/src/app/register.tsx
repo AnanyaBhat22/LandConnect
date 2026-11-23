@@ -4,10 +4,10 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import type { Role } from '../../api/types';
-import { useAuth } from '../../auth/AuthContext';
-import { Button, TextField } from '../../components/ui';
-import { colors, roleColors } from '../../theme';
+import type { Role } from '../api/types';
+import { useAuth } from '../auth/AuthContext';
+import { Button, TextField } from '../components/ui';
+import { colors, roleColors } from '../theme';
 
 const ROLES: { role: Role; icon: keyof typeof Ionicons.glyphMap; title: string; text: string }[] = [
   { role: 'BUYER', icon: 'search', title: 'Buyer', text: 'Browse land, chat and call sellers' },
