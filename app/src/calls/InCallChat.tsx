@@ -7,7 +7,7 @@
  * live in the Chats tab instead.
  */
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChat } from '@livekit/react-native';
 
@@ -48,16 +48,23 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
   const newestFirst = [...chat.chatMessages].reverse();
 
   return (
-    // Layout chosen so the keyboard can never hide the input: the panel covers
-    // the top ~70% of the screen with the input directly under its title.
-    // The keyboard only occupies the bottom of the screen, so whatever Android
-    // does (pan/resize/nothing over live video), the input stays visible.
-    <View style={styles.wrap}>
+    // Its own full-screen window (Modal), not a view on top of the call.
+    // Why: on Android, live video (WebRTC SurfaceViews) is drawn on a separate
+    // hardware layer that can paint OVER normal views, which hid the overlay
+    // panel. A Modal is a separate window above the call screen, so video
+    // can't cover it. The input sits at the top, so the keyboard can't either.
+    // The call keeps running underneath; "Back to call" closes the window.
+    <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={[styles.panel, { paddingTop: insets.top }]}>
+        <Pressable style={styles.callBar} onPress={onClose}>
+          <Ionicons name="call" size={14} color="white" />
+          <Text style={styles.callBarText}>Call in progress · tap to go back</Text>
+        </Pressable>
         <View style={styles.header}>
           <Text style={styles.title}>Chat in call</Text>
-          <Pressable onPress={onClose} hitSlop={12}>
-            <Ionicons name="close" size={24} color={colors.text} />
+          <Pressable onPress={onClose} hitSlop={12} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={18} color={colors.primary} />
+            <Text style={styles.backText}>Back to call</Text>
           </Pressable>
         </View>
         <View style={styles.inputRow}>
@@ -95,14 +102,17 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
           }}
         />
       </View>
-    </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  // absoluteFillObject was removed in this React Native version; spell it out.
-  wrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-start' },
-  panel: { height: '70%', backgroundColor: colors.background, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, overflow: 'hidden', elevation: 8 },
+
+  callBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, backgroundColor: colors.success },
+  callBarText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  backText: { color: colors.primary, fontWeight: '600', fontSize: 14 },
+  panel: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   title: { fontSize: 17, fontWeight: '600', color: colors.text },
   empty: { textAlign: 'center', color: colors.textMuted, marginTop: 24 },
