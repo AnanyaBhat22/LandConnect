@@ -65,7 +65,8 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 150
         }
-      ]
+      ],
+      "expo-video"
     ],
     "extra": {
       "eas": {

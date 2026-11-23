@@ -175,3 +175,44 @@ def test_room_closed_only_after_answered_call(client, session_factory, pushes):
 
     answered = asyncio.run(scenario())
     assert closed == [f"call_{answered}"]  # no room existed for the rejected call
+
+
+def test_send_video_and_document(client, pushes, monkeypatch):
+    from app.services import images as image_store
+
+    monkeypatch.setattr(
+        image_store, "upload_chat_video",
+        lambda data, cid: image_store.StoredAttachment(url="https://v.test/a.mp4", public_id="v1", thumb="https://v.test/a.jpg"),
+    )
+    monkeypatch.setattr(
+        image_store, "upload_chat_document",
+        lambda data, cid, name: image_store.StoredAttachment(url=f"https://d.test/{name}", public_id="d1"),
+    )
+    asha = register(client, email="asha@example.com")
+    ravi = register(client, email="ravi@example.com", role="SELLER")
+    conv = start(client, asha, ravi["user"]["id"])
+    url = f"/conversations/{conv['id']}/attachments"
+
+    video = client.post(url, files={"file": ("walk.mp4", b"\x00" * 100, "video/mp4")}, headers=auth_header(ravi))
+    assert video.status_code == 201 and video.json()["type"] == "VIDEO"
+    body = json.loads(video.json()["body"])
+    assert body["thumb"] == "https://v.test/a.jpg" and body["size"] == 100 and body["name"] == "walk.mp4"
+
+    doc = client.post(url, files={"file": ("7-12 extract.pdf", b"%PDF-1.4", "application/pdf")}, headers=auth_header(ravi))
+    assert doc.status_code == 201 and doc.json()["type"] == "FILE"
+    assert json.loads(doc.json()["body"])["name"] == "7-12 extract.pdf"
+
+    assert client.post(url, files={"file": ("x.exe", b"MZ", "application/x-msdownload")}, headers=auth_header(ravi)).status_code == 415
+    pushed_types = [d["type"] for e, d, uid in pushes if e == "message:new" and uid == asha["user"]["id"]]
+    assert "VIDEO" in pushed_types and "FILE" in pushed_types
+
+
+def test_attachment_size_limit(client, pushes, monkeypatch):
+    from app.services import images as image_store
+
+    monkeypatch.setattr(image_store, "MAX_DOCUMENT_BYTES", 10)
+    asha = register(client, email="asha@example.com")
+    ravi = register(client, email="ravi@example.com", role="SELLER")
+    conv = start(client, asha, ravi["user"]["id"])
+    res = client.post(f"/conversations/{conv['id']}/attachments", files={"file": ("big.pdf", b"x" * 11, "application/pdf")}, headers=auth_header(asha))
+    assert res.status_code == 413

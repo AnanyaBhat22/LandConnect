@@ -7,8 +7,9 @@
  * it fails. New messages arrive over the socket (message:new).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,15 +21,30 @@ import { useAuth } from '../../auth/AuthContext';
 import { useCalls } from '../../calls/CallContext';
 import { dayLabel, describeCall, timeLabel } from '../../chat/format';
 import { useUnread } from '../../chat/UnreadContext';
+import { FileBubbleContent, parseAttachment, VideoBubbleContent, VideoPlayerModal } from '../../chat/Attachments';
 import { FullScreenViewer } from '../../components/PhotoGallery';
 import { Avatar } from '../../components/ui';
 import { formatPrice } from '../../lib/format';
-import { useKeyboardHeight } from '../../lib/useKeyboardHeight';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSocket } from '../../realtime/SocketContext';
 import { colors, fonts } from '../../theme';
 
 const TYPING_SEND_INTERVAL = 3000; // throttle: at most one "typing" event per 3 s
 const TYPING_SHOW_FOR = 4000; // hide "typing…" if nothing new arrives for 4 s
+const MAX_VIDEO = 40 * 1024 * 1024; // matches the server limits
+const MAX_DOC = 10 * 1024 * 1024;
+const DOC_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+];
+type PendingFile = { uri: string; name: string; type: string; size?: number };
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,7 +53,7 @@ export default function ChatScreen() {
   const { startCall } = useCalls();
   const { refresh: refreshUnread } = useUnread();
   const insets = useSafeAreaInsets();
-  const keyboardHeight = useKeyboardHeight();
+  const keyboardOpen = useKeyboardState((s) => s.isVisible);
 
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]); // oldest → newest
@@ -47,7 +63,8 @@ export default function ChatScreen() {
   const [peerTyping, setPeerTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
-  const pendingFiles = useRef<Record<string, { uri: string; name: string; type: string }>>({}); // for retrying failed pictures
+  const pendingFiles = useRef<Record<string, PendingFile>>({}); // for retrying failed uploads
+  const [playing, setPlaying] = useState<string | null>(null); // full-screen video
   const [viewing, setViewing] = useState<string | null>(null); // full-screen picture
   const myId = user?.id ?? '';
 
@@ -127,34 +144,44 @@ export default function ChatScreen() {
     }
   };
 
-  /** Pictures: shown instantly from the local file, uploaded via XHR (see uploadFile), then swapped for the server copy. */
-  const sendImage = async (file: { uri: string; name: string; type: string }, retryId?: string) => {
-    const tempId = retryId ?? `temp-img-${Date.now()}`;
+  /**
+   * Photos, videos and documents: shown instantly (photos from the local file,
+   * videos/documents as an "uploading" card), uploaded via XHR (see uploadFile),
+   * then swapped for the server's copy.
+   */
+  const sendFile = async (file: PendingFile, retryId?: string) => {
+    const kind: ChatMessage['type'] = file.type.startsWith('image/') ? 'IMAGE' : file.type.startsWith('video/') ? 'VIDEO' : 'FILE';
+    if (kind !== 'IMAGE' && file.size && file.size > (kind === 'VIDEO' ? MAX_VIDEO : MAX_DOC)) {
+      Alert.alert('File too large', kind === 'VIDEO' ? 'Videos can be up to 40 MB (about a minute).' : 'Documents can be up to 10 MB.');
+      return;
+    }
+    const tempId = retryId ?? `temp-file-${Date.now()}`;
     pendingFiles.current[tempId] = file;
-    const optimistic: ChatMessage = { id: tempId, conversation_id: id, sender_id: myId, type: 'IMAGE', body: file.uri, created_at: new Date().toISOString(), pending: 'sending' };
+    const body = kind === 'IMAGE' ? file.uri : JSON.stringify({ url: file.uri, name: file.name, size: file.size ?? 0, mime: file.type });
+    const optimistic: ChatMessage = { id: tempId, conversation_id: id, sender_id: myId, type: kind, body, created_at: new Date().toISOString(), pending: 'sending' };
     setMessages((list) => (retryId ? list.map((m) => (m.id === retryId ? optimistic : m)) : [...list, optimistic]));
     try {
-      const saved = await uploadFile<ChatMessage>(`/conversations/${id}/images`, file);
+      const saved = await uploadFile<ChatMessage>(`/conversations/${id}/${kind === 'IMAGE' ? 'images' : 'attachments'}`, file);
       delete pendingFiles.current[tempId];
       setMessages((list) => {
         const withoutTemp = list.filter((m) => m.id !== tempId);
         return withoutTemp.some((m) => m.id === saved.id) ? withoutTemp : [...withoutTemp, saved];
       });
     } catch (e: any) {
-      console.warn('[chat] picture upload failed', e?.message);
+      console.warn('[chat] attachment upload failed', e?.message);
       setMessages((list) => list.map((m) => (m.id === tempId ? { ...m, pending: 'failed' } : m)));
     }
   };
 
-  const pickImage = () =>
-    Alert.alert('Send a photo', undefined, [
-      { text: 'Camera', onPress: () => choose('camera') },
-      { text: 'Gallery', onPress: () => choose('library') },
-      { text: 'Cancel', style: 'cancel' },
+  const pickAttachment = () =>
+    Alert.alert('Send', undefined, [
+      { text: 'Camera', onPress: () => chooseMedia('camera') },
+      { text: 'Photo or video', onPress: () => chooseMedia('library') },
+      { text: 'Document', onPress: chooseDocument },
     ]);
 
-  const choose = async (source: 'camera' | 'library') => {
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+  const chooseMedia = async (source: 'camera' | 'library') => {
+    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: source === 'camera' ? ['images'] : ['images', 'videos'], quality: 0.7, videoMaxDuration: 60 };
     if (source === 'camera') {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) return Alert.alert('Camera permission', 'Allow camera access to take photos.');
@@ -162,11 +189,24 @@ export default function ChatScreen() {
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
     if (result.canceled || !result.assets[0]) return;
     const a = result.assets[0];
-    sendImage({ uri: a.uri, name: a.fileName ?? `chat-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg' });
+    const isVideo = a.type === 'video';
+    sendFile({
+      uri: a.uri,
+      name: a.fileName ?? `chat-${Date.now()}.${isVideo ? 'mp4' : 'jpg'}`,
+      type: a.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+      size: a.fileSize,
+    });
+  };
+
+  const chooseDocument = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: DOC_TYPES, copyToCacheDirectory: true });
+    if (result.canceled || !result.assets[0]) return;
+    const d = result.assets[0];
+    sendFile({ uri: d.uri, name: d.name, type: d.mimeType ?? 'application/octet-stream', size: d.size });
   };
 
   const retry = (m: ChatMessage) => {
-    if (m.type === 'IMAGE' && pendingFiles.current[m.id]) sendImage(pendingFiles.current[m.id], m.id);
+    if (m.type !== 'TEXT' && pendingFiles.current[m.id]) sendFile(pendingFiles.current[m.id], m.id);
     else send(m.body, m.id);
   };
 
@@ -219,7 +259,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.sand }}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: colors.sand }}>
       {header}
       {conv.listing && (
         <Pressable style={styles.listingBar} onPress={() => router.push({ pathname: '/listing/[id]', params: { id: conv.listing!.id } })}>
@@ -266,15 +306,15 @@ export default function ChatScreen() {
                   <Text style={styles.dayText}>{dayLabel(item.created_at)}</Text>
                 </View>
               )}
-              <MessageRow msg={item} myId={myId} readByPeer={new Date(item.created_at).getTime() <= peerReadAt} onRetry={() => retry(item)} onOpenImage={setViewing} />
+              <MessageRow msg={item} myId={myId} readByPeer={new Date(item.created_at).getTime() <= peerReadAt} onRetry={() => retry(item)} onOpenImage={setViewing} onPlayVideo={setPlaying} />
             </View>
           );
         }}
       />
 
-      {/* Keyboard open: sit right above it. Closed: clear Android's nav bar. */}
-      <View style={[styles.inputBar, { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 8 : 8 + insets.bottom }]}>
-        <Pressable style={styles.attach} onPress={pickImage} hitSlop={6}>
+      {/* Keyboard open: KeyboardAvoidingView lifts us above it. Closed: clear Android's nav bar. */}
+      <View style={[styles.inputBar, { paddingBottom: keyboardOpen ? 8 : 8 + insets.bottom }]}>
+        <Pressable style={styles.attach} onPress={pickAttachment} hitSlop={6}>
           <Ionicons name="attach" size={24} color={colors.textMuted} style={{ transform: [{ rotate: '45deg' }] }} />
         </Pressable>
         <TextInput
@@ -290,28 +330,44 @@ export default function ChatScreen() {
           <Ionicons name="send" size={20} color="white" />
         </Pressable>
       </View>
+      {playing && <VideoPlayerModal url={playing} onClose={() => setPlaying(null)} />}
       {viewing && <FullScreenViewer images={[{ id: viewing, url: viewing, position: 0 }]} start={0} onClose={() => setViewing(null)} />}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
-/** Three dots pulsing in turn, like WhatsApp's "typing" bubble. */
+/** Three dots bouncing in a wave, like WhatsApp's "typing" bubble (native-driven, so it stays smooth). */
 function TypingBubble() {
-  const [step, setStep] = useState(0);
+  const dots = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
   useEffect(() => {
-    const t = setInterval(() => setStep((s) => (s + 1) % 3), 400);
-    return () => clearInterval(t);
-  }, []);
+    const bounce = (v: Animated.Value) =>
+      Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: 260, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      ]);
+    const loop = Animated.loop(Animated.sequence([Animated.stagger(140, dots.map(bounce)), Animated.delay(250)]));
+    loop.start();
+    return () => loop.stop();
+  }, [dots]);
   return (
     <View style={[styles.bubble, styles.theirs, styles.typingBubble]}>
-      {[0, 1, 2].map((i) => (
-        <View key={i} style={[styles.typingDot, i === step && { opacity: 1, transform: [{ translateY: -2 }] }]} />
+      {dots.map((v, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.typingDot,
+            {
+              opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
+              transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }],
+            },
+          ]}
+        />
       ))}
     </View>
   );
 }
 
-function MessageRow({ msg, myId, readByPeer, onRetry, onOpenImage }: { msg: ChatMessage; myId: string; readByPeer: boolean; onRetry: () => void; onOpenImage: (url: string) => void }) {
+function MessageRow({ msg, myId, readByPeer, onRetry, onOpenImage, onPlayVideo }: { msg: ChatMessage; myId: string; readByPeer: boolean; onRetry: () => void; onOpenImage: (url: string) => void; onPlayVideo: (url: string) => void }) {
   if (msg.type === 'SYSTEM') {
     return (
       <View style={styles.systemPill}>
@@ -332,14 +388,21 @@ function MessageRow({ msg, myId, readByPeer, onRetry, onOpenImage }: { msg: Chat
   }
   const mine = msg.sender_id === myId;
   const isImage = msg.type === 'IMAGE';
+  const att = msg.type === 'VIDEO' || msg.type === 'FILE' ? parseAttachment(msg.body) : null;
+  const uploading = msg.pending === 'sending';
   return (
     <Pressable
+      // Videos and documents handle their own taps; images open the viewer; failed sends retry.
       disabled={!isImage && msg.pending !== 'failed'}
       onPress={msg.pending === 'failed' ? onRetry : isImage ? () => onOpenImage(msg.body) : undefined}
-      style={[styles.bubble, mine ? styles.mine : styles.theirs, isImage && styles.imageBubble]}
+      style={[styles.bubble, mine ? styles.mine : styles.theirs, (isImage || msg.type === 'VIDEO') && styles.imageBubble]}
     >
       {isImage ? (
-        <Image source={{ uri: msg.body }} style={[styles.chatImage, msg.pending === 'sending' && { opacity: 0.6 }]} contentFit="cover" transition={150} />
+        <Image source={{ uri: msg.body }} style={[styles.chatImage, uploading && { opacity: 0.6 }]} contentFit="cover" transition={150} />
+      ) : msg.type === 'VIDEO' ? (
+        <VideoBubbleContent att={att} uploading={uploading || msg.pending === 'failed'} onPress={() => att && onPlayVideo(att.url)} />
+      ) : msg.type === 'FILE' ? (
+        <FileBubbleContent att={att} uploading={uploading || msg.pending === 'failed'} />
       ) : (
         <Text style={styles.body}>{msg.body}</Text>
       )}
@@ -389,5 +452,5 @@ const styles = StyleSheet.create({
   imageBubble: { padding: 4, paddingBottom: 4 },
   chatImage: { width: 220, height: 220, borderRadius: 10 },
   typingBubble: { flexDirection: 'row', gap: 5, paddingVertical: 14, paddingHorizontal: 16 },
-  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.textMuted, opacity: 0.4 },
+  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.textMuted },
 });

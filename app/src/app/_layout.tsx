@@ -8,6 +8,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { CallProvider } from '../calls/CallContext';
@@ -64,6 +65,8 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({ Comfortaa_600SemiBold, Comfortaa_700Bold });
   return (
     <SafeAreaProvider>
+      {/* Native keyboard tracking: works with Android's edge-to-edge mode, where the keyboard overlays the app. */}
+      <KeyboardProvider>
       <StatusBar style="light" />
       <AuthProvider>
         <SocketProvider>
@@ -74,6 +77,7 @@ export default function RootLayout() {
           </UnreadProvider>
         </SocketProvider>
       </AuthProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }

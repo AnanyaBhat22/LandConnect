@@ -54,7 +54,16 @@ export function previewText(msg: ChatMessage | null, myId: string): string {
   if (!msg) return 'Say hello 👋';
   if (msg.type === 'CALL_LOG') return `📞 ${describeCall(msg, myId).text}`;
   if (msg.type === 'SYSTEM') return msg.body;
-  if (msg.type === 'IMAGE') return `${msg.sender_id === myId ? 'You: ' : ''}📷 Photo`;
+  const you = msg.sender_id === myId ? 'You: ' : '';
+  if (msg.type === 'IMAGE') return `${you}📷 Photo`;
+  if (msg.type === 'VIDEO') return `${you}🎥 Video`;
+  if (msg.type === 'FILE') {
+    try {
+      return `${you}📄 ${JSON.parse(msg.body).name}`;
+    } catch {
+      return `${you}📄 Document`;
+    }
+  }
   return `${msg.sender_id === myId ? 'You: ' : ''}${msg.body}`;
 }
 

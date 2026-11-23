@@ -56,6 +56,8 @@ class MessageType(str, enum.Enum):
     SYSTEM = "SYSTEM"
     CALL_LOG = "CALL_LOG"
     IMAGE = "IMAGE"  # body = image URL. Stored as VARCHAR (non-native enum), so no migration was needed
+    VIDEO = "VIDEO"  # body = JSON {url, thumb, name, size, mime}
+    FILE = "FILE"  # body = JSON {url, name, size, mime}
 
 
 class CallKind(str, enum.Enum):

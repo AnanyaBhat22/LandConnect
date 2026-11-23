@@ -4,6 +4,7 @@ Sending is a normal REST call (validated, stored, easy to retry), and the
 server then pushes `message:new` to every device of both participants over
 Socket.IO, so the other person sees it instantly without polling.
 """
+import json
 import uuid
 from datetime import UTC, datetime
 
@@ -208,12 +209,57 @@ def send_image(
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Send a JPEG, PNG, WebP or HEIC photo")
     data = file.file.read(image_store.MAX_BYTES + 1)
     if len(data) > image_store.MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Photo is larger than 8 MB")
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Photo is larger than 8 MB")
     try:
         stored = image_store.upload_chat_image(data, str(conv.id))
     except Exception:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Photo upload failed, please try again")
     msg = chat_service.add_message(db, conv, user.id, stored.url, MessageType.IMAGE)
+    me.last_read_at = msg.created_at
+    db.commit()
+    db.refresh(msg)
+    _push("message:new", chat_service.message_payload(msg), [user.id, peer.user_id])
+    return msg
+
+
+@router.post("/{conversation_id}/attachments", response_model=MessageOut, status_code=status.HTTP_201_CREATED)
+def send_attachment(
+    conversation_id: uuid.UUID,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Message:
+    """Send a video (≤ 40 MB) or a document such as a PDF, title deed scan or price sheet (≤ 10 MB).
+
+    The message body is JSON {url, name, size, mime[, thumb]} so the app can show
+    a video thumbnail or a document card with its file name and size.
+    """
+    conv, me, peer = _membership(db, conversation_id, user)
+    if is_blocked_either_way(db, user.id, peer.user_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can't message this user")
+    mime = (file.content_type or "").lower()
+    if mime in image_store.VIDEO_TYPES:
+        kind, limit = MessageType.VIDEO, image_store.MAX_VIDEO_BYTES
+    elif mime in image_store.DOCUMENT_TYPES:
+        kind, limit = MessageType.FILE, image_store.MAX_DOCUMENT_BYTES
+    else:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Send a video (MP4/MOV) or a document (PDF, Word, Excel, PowerPoint, text)")
+    data = file.file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, f"File is larger than {limit // (1024 * 1024)} MB")
+    name = (file.filename or ("video.mp4" if kind == MessageType.VIDEO else "document"))[:120]
+    try:
+        stored = (
+            image_store.upload_chat_video(data, str(conv.id))
+            if kind == MessageType.VIDEO
+            else image_store.upload_chat_document(data, str(conv.id), name)
+        )
+    except Exception:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Upload failed, please try again")
+    body = {"url": stored.url, "name": name, "size": len(data), "mime": mime}
+    if stored.thumb:
+        body["thumb"] = stored.thumb
+    msg = chat_service.add_message(db, conv, user.id, json.dumps(body), kind)
     me.last_read_at = msg.created_at
     db.commit()
     db.refresh(msg)

@@ -184,7 +184,7 @@ async def upload_image(
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Upload a JPEG, PNG, WebP or HEIC photo")
     data = await file.read(image_store.MAX_BYTES + 1)
     if len(data) > image_store.MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Photo is larger than 8 MB")
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Photo is larger than 8 MB")
     try:
         stored = image_store.upload_listing_image(data, str(listing.id))
     except Exception:

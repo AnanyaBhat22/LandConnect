@@ -11,7 +11,9 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { useChat } from '@livekit/react-native';
 
-import { useKeyboardHeight } from '../lib/useKeyboardHeight';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { colors } from '../theme';
 
 /** Messages + unread count; lives in the call UI so nothing is lost while the panel is closed. */
@@ -29,7 +31,8 @@ type Chat = ReturnType<typeof useInCallChat>;
 export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => void }) {
   const [text, setText] = useState('');
   const listRef = useRef<FlatList>(null);
-  const keyboardHeight = useKeyboardHeight();
+  const insets = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardState((s) => s.isVisible);
 
   const send = async () => {
     const msg = text.trim();
@@ -43,8 +46,9 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
   };
 
   return (
-    // Lift the panel above the keyboard (edge-to-edge Android doesn't resize the window).
-    <View style={[styles.wrap, { paddingBottom: keyboardHeight }]}>
+    // react-native-keyboard-controller lifts the panel above the keyboard
+    // (Android edge-to-edge doesn't resize the window for it).
+    <KeyboardAvoidingView behavior="padding" style={styles.wrap}>
       <View style={styles.panel}>
         <View style={styles.header}>
           <Text style={styles.title}>Chat in call</Text>
@@ -70,7 +74,8 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
             );
           }}
         />
-        <View style={styles.inputRow}>
+        {/* Keyboard closed: keep the input above Android's Back/Home bar. */}
+        <View style={[styles.inputRow, { paddingBottom: 10 + (keyboardOpen ? 0 : insets.bottom) }]}>
           <TextInput
             style={styles.input}
             value={text}
@@ -78,14 +83,15 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
             placeholder="Message"
             placeholderTextColor={colors.textMuted}
             onSubmitEditing={send}
+            submitBehavior="submit" // keep the keyboard open after sending, like a chat app
             returnKeyType="send"
           />
-          <Pressable style={[styles.send, !text.trim() && { opacity: 0.5 }]} onPress={send} disabled={!text.trim()}>
+          <Pressable style={[styles.send, !text.trim() && { opacity: 0.5 }]} onPress={send} disabled={!text.trim()} hitSlop={8}>
             <Ionicons name="send" size={18} color="white" />
           </Pressable>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -6,7 +6,8 @@
  * each request small and lets one failed photo fail on its own.
  */
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +17,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { api, uploadFile } from '../../api/client';
 import type { Listing, ListingImage, ListingInput } from '../../api/types';
 import { LocationPicker, type PickedPlace } from '../../components/LocationPicker';
-import { useKeyboardHeight } from '../../lib/useKeyboardHeight';
 import { Button, TextField } from '../../components/ui';
 import { colors } from '../../theme';
 
@@ -28,7 +28,6 @@ export default function EditListingScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = !!id;
   const insets = useSafeAreaInsets(); // room for Android's nav bar below the Save button
-  const keyboardHeight = useKeyboardHeight(); // so the last fields can scroll above the keyboard
 
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
@@ -164,9 +163,10 @@ export default function EditListingScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <>
       <Stack.Screen options={{ title: editing ? 'Edit listing' : 'List your land' }} />
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 48 + Math.max(insets.bottom, keyboardHeight) }]} keyboardShouldPersistTaps="handled">
+      {/* Scrolls the focused field above the keyboard (works with edge-to-edge Android). */}
+      <KeyboardAwareScrollView bottomOffset={24} contentContainerStyle={[styles.container, { paddingBottom: 48 + insets.bottom }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.section}>Photos</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
           {existing.map((img) => (
@@ -268,8 +268,8 @@ export default function EditListingScreen() {
 
         {progress && <Text style={styles.progress}>{progress}</Text>}
         <Button title={editing ? 'Save changes' : 'Publish listing'} onPress={save} loading={saving} style={{ marginTop: 8 }} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
+    </>
   );
 }
 

@@ -209,7 +209,8 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
   const barsVisible = controlsShown || !showingVideo;
   // A shared screen sits *between* the bars while they're visible, so its
   // top and bottom are never hidden behind them.
-  const videoStyle = sharing && barsVisible ? styles.betweenBars : StyleSheet.absoluteFill;
+  // With the in-call chat open (it covers the lower 60%), the video moves into the space above it.
+  const videoStyle = chatOpen ? styles.aboveChat : sharing && barsVisible ? styles.betweenBars : StyleSheet.absoluteFill;
 
   return (
     <View style={styles.activeScreen}>
@@ -288,6 +289,7 @@ const styles = StyleSheet.create({
   controlsBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17,27,33,0.85)', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   controls: { flexDirection: 'row', justifyContent: 'space-evenly', paddingVertical: 18 },
   betweenBars: { position: 'absolute', left: 0, right: 0, top: 100, bottom: 110 },
+  aboveChat: { position: 'absolute', left: 0, right: 0, top: 90, height: '32%' },
   selfViewSmall: { width: 80, height: 120, top: 104 },
   tapHint: { position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14 },
   tapHintText: { color: 'white', fontSize: 13 },
