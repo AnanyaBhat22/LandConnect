@@ -4,11 +4,12 @@
  * Stack.Protected shows the login screens or the main app depending on auth,
  * and <CallOverlay/> sits above every screen so calls can ring anywhere.
  */
-import { ActivityIndicator, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { AndroidSoftInputModes, KeyboardController, KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { CallProvider } from '../calls/CallContext';
@@ -63,10 +64,19 @@ export default function RootLayout() {
   // dev build), so adding them needs no native rebuild. If loading fails we
   // still start, falling back to the system font.
   const [loaded, error] = useFonts({ Comfortaa_600SemiBold, Comfortaa_700Bold });
+
+  // Root cause of "the keyboard covers the input": Android wasn't resizing the
+  // window or reporting keyboard insets to the app (soft input mode wasn't
+  // "resize"), so neither KeyboardAvoidingView nor Keyboard events ever fired.
+  // Force adjustResize at runtime; app.json sets the same for future builds.
+  useEffect(() => {
+    if (Platform.OS === 'android') KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_RESIZE);
+  }, []);
+
   return (
     <SafeAreaProvider>
-      {/* Native keyboard tracking: works with Android's edge-to-edge mode, where the keyboard overlays the app. */}
-      <KeyboardProvider>
+      {/* Native keyboard tracking. The app is edge-to-edge (draws under the status and navigation bars). */}
+      <KeyboardProvider statusBarTranslucent navigationBarTranslucent preserveEdgeToEdge>
       <StatusBar style="light" />
       <AuthProvider>
         <SocketProvider>

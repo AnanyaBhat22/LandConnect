@@ -21,6 +21,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useCalls } from '../../calls/CallContext';
 import { dayLabel, describeCall, timeLabel } from '../../chat/format';
 import { useUnread } from '../../chat/UnreadContext';
+import { AttachSheet } from '../../chat/AttachSheet';
 import { FileBubbleContent, parseAttachment, VideoBubbleContent, VideoPlayerModal } from '../../chat/Attachments';
 import { FullScreenViewer } from '../../components/PhotoGallery';
 import { Avatar } from '../../components/ui';
@@ -65,6 +66,7 @@ export default function ChatScreen() {
   const lastTypingSent = useRef(0);
   const pendingFiles = useRef<Record<string, PendingFile>>({}); // for retrying failed uploads
   const [playing, setPlaying] = useState<string | null>(null); // full-screen video
+  const [attachOpen, setAttachOpen] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null); // full-screen picture
   const myId = user?.id ?? '';
 
@@ -173,12 +175,7 @@ export default function ChatScreen() {
     }
   };
 
-  const pickAttachment = () =>
-    Alert.alert('Send', undefined, [
-      { text: 'Camera', onPress: () => chooseMedia('camera') },
-      { text: 'Photo or video', onPress: () => chooseMedia('library') },
-      { text: 'Document', onPress: chooseDocument },
-    ]);
+  const pickAttachment = () => setAttachOpen(true);
 
   const chooseMedia = async (source: 'camera' | 'library') => {
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: source === 'camera' ? ['images'] : ['images', 'videos'], quality: 0.7, videoMaxDuration: 60 };
@@ -330,6 +327,7 @@ export default function ChatScreen() {
           <Ionicons name="send" size={20} color="white" />
         </Pressable>
       </View>
+      <AttachSheet visible={attachOpen} onClose={() => setAttachOpen(false)} onDocument={chooseDocument} onGallery={() => chooseMedia('library')} onCamera={() => chooseMedia('camera')} />
       {playing && <VideoPlayerModal url={playing} onClose={() => setPlaying(null)} />}
       {viewing && <FullScreenViewer images={[{ id: viewing, url: viewing, position: 0 }]} start={0} onClose={() => setViewing(null)} />}
     </KeyboardAvoidingView>
