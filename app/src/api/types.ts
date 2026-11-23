@@ -78,3 +78,27 @@ export type ListingInput = Pick<
   Listing,
   'title' | 'description' | 'price_inr' | 'area_sqft' | 'latitude' | 'longitude' | 'address' | 'city' | 'hide_exact_location'
 >;
+
+export type MessageType = 'TEXT' | 'SYSTEM' | 'CALL_LOG';
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string | null;
+  type: MessageType;
+  body: string;
+  created_at: string;
+  /** Client-only: optimistic messages before/after the server confirms them. */
+  pending?: 'sending' | 'failed';
+}
+
+export interface Conversation {
+  id: string;
+  peer: UserPublic;
+  peer_online: boolean | null;
+  peer_last_read_at: string | null;
+  listing: { id: string; title: string; price_inr: number; city: string | null; image_url: string | null } | null;
+  last_message: ChatMessage | null;
+  unread: number;
+  updated_at: string;
+}

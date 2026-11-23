@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../api/client';
 import type { Listing } from '../../api/types';
 import { useCalls } from '../../calls/CallContext';
+import { openChat } from '../../chat/openChat';
 import { ListingPhoto } from '../../components/ListingCard';
 import { PhotoGallery } from '../../components/PhotoGallery';
 import { MiniMap } from '../../components/LandMap';
@@ -184,7 +185,7 @@ export default function ListingDetailScreen() {
 
       {!listing.is_owner && (
         <View style={[styles.contactBar, { paddingBottom: 14 + insets.bottom }]}>
-          <Pressable style={[styles.contactBtn, styles.chatBtn]} onPress={() => Alert.alert('Chat is coming next', 'Messaging is the next feature being built. For now, call the owner in the app.')}>
+          <Pressable style={[styles.contactBtn, styles.chatBtn]} onPress={() => openChat(listing.owner.id, listing.id)}>
             <Ionicons name="chatbubble-ellipses" size={20} color={colors.primary} />
             <Text style={[styles.contactText, { color: colors.primary }]}>Chat</Text>
           </Pressable>

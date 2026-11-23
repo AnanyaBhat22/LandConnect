@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useSocket } from '../../realtime/SocketContext';
+import { useUnread } from '../../chat/UnreadContext';
 import { Wordmark } from '../../components/Brand';
 import { colors, fonts } from '../../theme';
 
@@ -13,6 +14,7 @@ function ConnectionDot() {
 }
 
 export default function TabsLayout() {
+  const { unread } = useUnread();
   return (
     <Tabs
       screenOptions={{
@@ -27,7 +29,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Chats', headerTitle: () => <Wordmark size={21} />, tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" color={color as string} size={size} /> }}
+        options={{ title: 'Chats', headerTitle: () => <Wordmark size={21} />, tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined, tabBarBadgeStyle: { backgroundColor: colors.accent }, tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" color={color as string} size={size} /> }}
       />
       <Tabs.Screen
         name="community"

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../api/client';
 import type { UserPublic } from '../api/types';
 import { useCalls } from '../calls/CallContext';
+import { openChat } from '../chat/openChat';
 import { Avatar, EmptyState, RoleBadge } from '../components/ui';
 import { colors } from '../theme';
 
@@ -69,6 +70,9 @@ export default function NewCallScreen() {
               <Text style={styles.name}>{item.name}</Text>
               <RoleBadge role={item.role} />
             </View>
+            <Pressable hitSlop={10} onPress={() => openChat(item.id)} style={styles.action}>
+              <Ionicons name="chatbubble-ellipses" size={22} color={colors.primary} />
+            </Pressable>
             <Pressable hitSlop={10} onPress={() => startCall(item, 'AUDIO')} style={styles.action}>
               <Ionicons name="call" size={22} color={colors.primary} />
             </Pressable>
