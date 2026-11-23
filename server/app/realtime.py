@@ -102,6 +102,32 @@ async def disconnect(sid: str, *args: Any) -> None:
         await calls.user_offline(user_id)
 
 
+# ---------- chat: typing indicator ----------
+
+@sio.on("typing")
+async def typing(sid: str, data: dict | None) -> None:
+    """Forward 'X is typing…' to the other participant. Fire-and-forget, never stored."""
+    conv_id = _parse_uuid((data or {}).get("conversation_id"))
+    if conv_id is None:
+        return
+    user_id = await _user_id(sid)
+
+    def peers() -> list[uuid.UUID] | None:
+        from app.services.chat import participant_ids
+
+        with calls.session_factory() as db:
+            ids = participant_ids(db, conv_id)
+        return ids if user_id in ids else None
+
+    ids = await asyncio.to_thread(peers)
+    if ids is None:
+        return  # not a member: silently ignore
+    # The app throttles typing events (at most one every ~3 s), so this lookup is cheap.
+    for uid in ids:
+        if uid != user_id:
+            await emit_to_user("typing", {"conversation_id": str(conv_id), "user_id": str(user_id)}, uid)
+
+
 # ---------- call signalling ----------
 
 @sio.on("call:invite")

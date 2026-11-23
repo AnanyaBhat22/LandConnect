@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session, aliased
 from app.core.config import settings
 from app.models import Block, CallKind, CallLog, CallPermission, CallStatus, Participant, User
 from app.schemas import UserPublic
+from app.services import chat as chat_service
 from app.services.livekit import call_room_name, create_join_token
 
 Emit = Callable[[str, dict[str, Any], uuid.UUID], Awaitable[None]]
@@ -313,7 +314,16 @@ class CallManager:
             grace = self._grace_timers.pop(uid, None)
             if grace and grace is not asyncio.current_task():
                 grace.cancel()
-        await self._db(lambda db: self._update_log(db, call.id, status, ended=True))
+        def close_log(db: Session) -> dict | None:
+            self._update_log(db, call.id, status, ended=True)
+            # Show the call in the pair's chat, WhatsApp-style ("Missed video call").
+            msg = chat_service.call_log_message(db, db.get(CallLog, call.id))
+            db.commit()
+            return chat_service.message_payload(msg) if msg else None
+
+        chat_msg = await self._db(close_log)
         payload = {"call_id": str(call.id), "status": status.value, "reason": reason}
         for uid in (call.caller_id, call.callee_id):
             await self.emit("call:ended", payload, uid)
+            if chat_msg:
+                await self.emit("message:new", chat_msg, uid)
