@@ -26,7 +26,6 @@ import { FileBubbleContent, parseAttachment, VideoBubbleContent, VideoPlayerModa
 import { FullScreenViewer } from '../../components/PhotoGallery';
 import { Avatar } from '../../components/ui';
 import { formatPrice } from '../../lib/format';
-import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSocket } from '../../realtime/SocketContext';
 import { colors, fonts } from '../../theme';
 
@@ -54,7 +53,6 @@ export default function ChatScreen() {
   const { startCall } = useCalls();
   const { refresh: refreshUnread } = useUnread();
   const insets = useSafeAreaInsets();
-  const keyboardOpen = useKeyboardState((s) => s.isVisible);
 
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]); // oldest → newest
@@ -256,7 +254,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: colors.sand }}>
+    <View style={{ flex: 1, backgroundColor: colors.sand }}>
       {header}
       {conv.listing && (
         <Pressable style={styles.listingBar} onPress={() => router.push({ pathname: '/listing/[id]', params: { id: conv.listing!.id } })}>
@@ -309,8 +307,8 @@ export default function ChatScreen() {
         }}
       />
 
-      {/* Keyboard open: KeyboardAvoidingView lifts us above it. Closed: clear Android's nav bar. */}
-      <View style={[styles.inputBar, { paddingBottom: keyboardOpen ? 8 : 8 + insets.bottom }]}>
+      {/* Clear Android's nav bar. When typing, Android pans the screen so this stays above the keyboard. */}
+      <View style={[styles.inputBar, { paddingBottom: 8 + insets.bottom }]}>
         <Pressable style={styles.attach} onPress={pickAttachment} hitSlop={6}>
           <Ionicons name="attach" size={24} color={colors.textMuted} style={{ transform: [{ rotate: '45deg' }] }} />
         </Pressable>
@@ -330,7 +328,7 @@ export default function ChatScreen() {
       <AttachSheet visible={attachOpen} onClose={() => setAttachOpen(false)} onDocument={chooseDocument} onGallery={() => chooseMedia('library')} onCamera={() => chooseMedia('camera')} />
       {playing && <VideoPlayerModal url={playing} onClose={() => setPlaying(null)} />}
       {viewing && <FullScreenViewer images={[{ id: viewing, url: viewing, position: 0 }]} start={0} onClose={() => setViewing(null)} />}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

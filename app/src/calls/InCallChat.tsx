@@ -11,7 +11,6 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { useChat } from '@livekit/react-native';
 
-import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '../theme';
@@ -32,7 +31,6 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
   const [text, setText] = useState('');
   const listRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
-  const keyboardOpen = useKeyboardState((s) => s.isVisible);
 
   const send = async () => {
     const msg = text.trim();
@@ -46,9 +44,8 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
   };
 
   return (
-    // react-native-keyboard-controller lifts the panel above the keyboard
-    // (Android edge-to-edge doesn't resize the window for it).
-    <KeyboardAvoidingView behavior="padding" style={styles.wrap}>
+    // When typing, Android pans the screen (adjustPan) so the input stays above the keyboard.
+    <View style={styles.wrap}>
       <View style={styles.panel}>
         <View style={styles.header}>
           <Text style={styles.title}>Chat in call</Text>
@@ -75,7 +72,7 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
           }}
         />
         {/* Keyboard closed: keep the input above Android's Back/Home bar. */}
-        <View style={[styles.inputRow, { paddingBottom: 10 + (keyboardOpen ? 0 : insets.bottom) }]}>
+        <View style={[styles.inputRow, { paddingBottom: 10 + insets.bottom }]}>
           <TextInput
             style={styles.input}
             value={text}
@@ -91,7 +88,7 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

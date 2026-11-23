@@ -65,18 +65,20 @@ export default function RootLayout() {
   // still start, falling back to the system font.
   const [loaded, error] = useFonts({ Comfortaa_600SemiBold, Comfortaa_700Bold });
 
-  // Root cause of "the keyboard covers the input": Android wasn't resizing the
-  // window or reporting keyboard insets to the app (soft input mode wasn't
-  // "resize"), so neither KeyboardAvoidingView nor Keyboard events ever fired.
-  // Force adjustResize at runtime; app.json sets the same for future builds.
+  // Root cause of "the keyboard covers the input": Expo SDK 58 forces Android
+  // edge-to-edge (react-native-edge-to-edge), and in edge-to-edge Android
+  // IGNORES adjustResize, so the window never shrank and no keyboard-avoiding
+  // logic ever triggered. adjustPan still works: the OS itself slides the
+  // window up so the focused input stays visible, with no JS measuring needed.
   useEffect(() => {
-    if (Platform.OS === 'android') KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_RESIZE);
+    if (Platform.OS === 'android') KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_PAN);
   }, []);
 
   return (
     <SafeAreaProvider>
-      {/* Native keyboard tracking. The app is edge-to-edge (draws under the status and navigation bars). */}
-      <KeyboardProvider statusBarTranslucent navigationBarTranslucent preserveEdgeToEdge>
+      {/* Provides KeyboardController (used above). Its own avoiding logic is not
+          used: with adjustPan the OS keeps the focused input visible. */}
+      <KeyboardProvider>
       <StatusBar style="light" />
       <AuthProvider>
         <SocketProvider>
