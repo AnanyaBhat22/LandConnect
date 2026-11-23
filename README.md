@@ -6,7 +6,7 @@ Built as a technical assignment prototype.
 
 ## Try it
 - **APK:** _link to be added_ (Android 8+; allow "install unknown apps")
-- **Hosted API:** _link to be added_ (`/health` returns `{"status":"ok"}`, `/docs` shows the interactive API)
+- **Hosted API:** https://landconnect-api-0zf4.onrender.com (`/health` returns `{"status":"ok"}`, `/docs` shows the interactive API)
 - **Demo accounts** (password `demo1234`): `asha@example.com` (Buyer), `ravi@example.com` (Seller), `meera@example.com` (Broker)
 
 > The backend is on Render's free tier, which **sleeps after about 15 minutes idle**. The first request after a pause can take 30–60 s. If login seems slow, wait and try again.

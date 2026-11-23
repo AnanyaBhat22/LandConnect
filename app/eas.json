@@ -11,7 +11,7 @@
     },
     "preview": {
       "distribution": "internal",
-      "env": { "EXPO_PUBLIC_API_URL": "https://landconnect-api.onrender.com" },
+      "env": { "EXPO_PUBLIC_API_URL": "https://landconnect-api-0zf4.onrender.com" },
       "android": { "buildType": "apk" }
     },
     "production": {
