@@ -14,6 +14,7 @@ import { AndroidSoftInputModes, KeyboardController, KeyboardProvider } from 'rea
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { CallProvider } from '../calls/CallContext';
 import { CallOverlay } from '../calls/CallOverlay';
+import { MeetingInviteListener } from '../calls/MeetingInviteListener';
 import { UnreadProvider } from '../chat/UnreadContext';
 import { SocketProvider } from '../realtime/SocketContext';
 import { colors, fonts } from '../theme';
@@ -48,12 +49,16 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="listing/edit" options={{ title: 'List your land' }} />
           <Stack.Screen name="my-listings" options={{ title: 'My listings' }} />
           <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
+          <Stack.Screen name="meetings/index" options={{ title: 'Meetings' }} />
+          <Stack.Screen name="meetings/new" options={{ title: 'New meeting' }} />
+          <Stack.Screen name="meeting/[id]" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn} redirectTo="/">
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
         </Stack.Protected>
       </Stack>
+      {signedIn && <MeetingInviteListener />}
       <CallOverlay />
     </>
   );

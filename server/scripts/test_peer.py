@@ -54,6 +54,21 @@ async def run(args: argparse.Namespace) -> None:
     sio = socketio.AsyncClient()
     done = asyncio.Event()
 
+    # ---------- meetings: auto-join when invited, browser = laptop camera ----------
+    @sio.on("meeting:invited")
+    async def on_meeting(data):
+        print(f"\n👥 Invited to meeting “{data['title']}” by {data['host']}")
+        await asyncio.sleep(2)
+        res = await http.post(f"/meetings/{data['meeting_id']}/join")
+        if res.status_code != 200:
+            print(f"   join failed: {res.status_code} {res.text[:120]}")
+            return
+        j = res.json()
+        link = meet_link(j["livekit_url"], j["token"])
+        print(f"   Joined. Laptop browser link:\n{link}")
+        if not args.no_browser:
+            webbrowser.open(link)
+
     # ---------- chat: auto-reply so one phone can test messaging ----------
     @sio.on("message:new")
     async def on_message(msg):

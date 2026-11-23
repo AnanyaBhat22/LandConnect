@@ -56,7 +56,19 @@ export default function CallsScreen() {
         data={items}
         keyExtractor={(i) => i.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} colors={[colors.primary]} />}
-        contentContainerStyle={items.length === 0 ? { flex: 1 } : undefined}
+        contentContainerStyle={items.length === 0 ? { flexGrow: 1 } : undefined}
+        ListHeaderComponent={
+          <Pressable style={styles.meetings} onPress={() => router.push('/meetings')}>
+            <View style={styles.meetingsIcon}>
+              <Ionicons name="people" size={22} color="white" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>Meetings</Text>
+              <Text style={styles.metaText}>Group video calls with buyers, sellers and brokers</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </Pressable>
+        }
         ListEmptyComponent={
           loading ? undefined : (
             <EmptyState
@@ -102,6 +114,8 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontWeight: '600', color: colors.text },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   metaText: { fontSize: 13, color: colors.textMuted },
+  meetings: { flexDirection: 'row', alignItems: 'center', gap: 14, margin: 12, padding: 14, borderRadius: 14, backgroundColor: colors.sand },
+  meetingsIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   fab: { position: 'absolute', right: 20, bottom: 24, width: 58, height: 58, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', elevation: 4 },
   fabPlus: { position: 'absolute', top: 12, right: 11 },
 });

@@ -102,3 +102,22 @@ export interface Conversation {
   unread: number;
   updated_at: string;
 }
+
+export interface Meeting {
+  id: string;
+  title: string;
+  host: UserPublic;
+  invitees: UserPublic[];
+  listing_id: string | null;
+  listing_title: string | null;
+  scheduled_at: string | null;
+  is_open: boolean;
+  is_host: boolean;
+  created_at: string;
+}
+
+export interface MeetingJoin {
+  room: string;
+  livekit_url: string;
+  token: string;
+}
