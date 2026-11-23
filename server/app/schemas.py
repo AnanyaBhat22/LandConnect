@@ -9,7 +9,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.models import CallPermission, Role
+from app.models import CallPermission, ListingStatus, Role
 
 
 class ORMModel(BaseModel):
@@ -84,3 +84,60 @@ class AuthOut(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: UserMe
+
+
+# ---------- Listings ----------
+
+class ListingImageOut(ORMModel):
+    id: uuid.UUID
+    url: str
+    position: int
+
+
+class ListingBase(BaseModel):
+    title: str = Field(min_length=4, max_length=120)
+    description: str = Field(default="", max_length=4000)
+    price_inr: int = Field(gt=0, le=10**12, description="Asking price in whole rupees")
+    area_sqft: float | None = Field(default=None, gt=0, le=10**9)
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    address: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=80)
+    hide_exact_location: bool = False
+
+
+class ListingCreate(ListingBase):
+    pass
+
+
+class ListingUpdate(BaseModel):
+    """All fields optional: PATCH only changes what's sent."""
+    title: str | None = Field(default=None, min_length=4, max_length=120)
+    description: str | None = Field(default=None, max_length=4000)
+    price_inr: int | None = Field(default=None, gt=0, le=10**12)
+    area_sqft: float | None = Field(default=None, gt=0, le=10**9)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    address: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=80)
+    hide_exact_location: bool | None = None
+    status: ListingStatus | None = None
+
+
+class ListingOut(ListingBase):
+    id: uuid.UUID
+    status: ListingStatus
+    owner: UserPublic
+    images: list[ListingImageOut]
+    is_owner: bool = False
+    is_favorite: bool = False
+    location_is_approximate: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+
+class ListingPage(BaseModel):
+    items: list[ListingOut]
+    total: int
+    limit: int
+    offset: int
