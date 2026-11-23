@@ -82,6 +82,10 @@ async def connect(sid: str, environ: dict, auth: dict | None = None) -> None:
         user_id = await asyncio.to_thread(lookup)
     except HTTPException:
         raise socketio.exceptions.ConnectionRefusedError("unauthorized")
+    except Exception:
+        # e.g. a brief network/DNS blip reaching the database. Refuse cleanly
+        # (the client retries) instead of leaving a half-open connection.
+        raise socketio.exceptions.ConnectionRefusedError("unavailable")
 
     await sio.save_session(sid, {"user_id": str(user_id)})
     await sio.enter_room(sid, user_room(user_id))

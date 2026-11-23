@@ -43,22 +43,45 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
     }
   };
 
+  // Newest first: the input sits at the TOP of the panel, so the latest
+  // messages are right under it.
+  const newestFirst = [...chat.chatMessages].reverse();
+
   return (
-    // When typing, Android pans the screen (adjustPan) so the input stays above the keyboard.
+    // Layout chosen so the keyboard can never hide the input: the panel covers
+    // the top ~70% of the screen with the input directly under its title.
+    // The keyboard only occupies the bottom of the screen, so whatever Android
+    // does (pan/resize/nothing over live video), the input stays visible.
     <View style={styles.wrap}>
-      <View style={styles.panel}>
+      <View style={[styles.panel, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <Text style={styles.title}>Chat in call</Text>
           <Pressable onPress={onClose} hitSlop={12}>
             <Ionicons name="close" size={24} color={colors.text} />
           </Pressable>
         </View>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="Message everyone in the call"
+            placeholderTextColor={colors.textMuted}
+            onSubmitEditing={send}
+            submitBehavior="submit" // keep the keyboard open after sending, like a chat app
+            returnKeyType="send"
+            autoFocus
+          />
+          <Pressable style={[styles.send, !text.trim() && { opacity: 0.5 }]} onPress={send} disabled={!text.trim()} hitSlop={8}>
+            <Ionicons name="send" size={18} color="white" />
+          </Pressable>
+        </View>
         <FlatList
           ref={listRef}
-          data={chat.chatMessages}
+          data={newestFirst}
           keyExtractor={(m) => m.id ?? String(m.timestamp)}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           contentContainerStyle={{ padding: 12, gap: 8, flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={<Text style={styles.empty}>Messages here are only visible during this call.</Text>}
           renderItem={({ item }) => {
             const mine = item.from?.isLocal;
@@ -71,22 +94,6 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
             );
           }}
         />
-        {/* Keyboard closed: keep the input above Android's Back/Home bar. */}
-        <View style={[styles.inputRow, { paddingBottom: 10 + insets.bottom }]}>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            placeholder="Message"
-            placeholderTextColor={colors.textMuted}
-            onSubmitEditing={send}
-            submitBehavior="submit" // keep the keyboard open after sending, like a chat app
-            returnKeyType="send"
-          />
-          <Pressable style={[styles.send, !text.trim() && { opacity: 0.5 }]} onPress={send} disabled={!text.trim()} hitSlop={8}>
-            <Ionicons name="send" size={18} color="white" />
-          </Pressable>
-        </View>
       </View>
     </View>
   );
@@ -94,8 +101,8 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
 
 const styles = StyleSheet.create({
   // absoluteFillObject was removed in this React Native version; spell it out.
-  wrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end' },
-  panel: { height: '60%', backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden' },
+  wrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-start' },
+  panel: { height: '70%', backgroundColor: colors.background, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, overflow: 'hidden', elevation: 8 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   title: { fontSize: 17, fontWeight: '600', color: colors.text },
   empty: { textAlign: 'center', color: colors.textMuted, marginTop: 24 },
@@ -105,7 +112,7 @@ const styles = StyleSheet.create({
   sender: { fontSize: 12, fontWeight: '600', color: colors.secondary, marginBottom: 2 },
   message: { fontSize: 15, color: colors.text },
   time: { fontSize: 10, color: colors.textMuted, alignSelf: 'flex-end', marginTop: 2 },
-  inputRow: { flexDirection: 'row', gap: 8, padding: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  inputRow: { flexDirection: 'row', gap: 8, padding: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   input: { flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16, backgroundColor: colors.surface, color: colors.text, fontSize: 15 },
   send: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
 });
