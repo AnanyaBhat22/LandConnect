@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '../auth/AuthContext';
 import { Button, TextField } from '../components/ui';
-import { colors } from '../theme';
+import { LogoMark, Wordmark } from '../components/Brand';
+import { colors, fonts } from '../theme';
 
 const DEMO_ACCOUNTS = [
   { label: 'Buyer', email: 'asha@example.com' },
@@ -36,11 +36,14 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={styles.logo}>
-            <Ionicons name="map" size={40} color={colors.white} />
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          {/* Hero styled after LandConnect's own banner. */}
+          <View style={styles.hero}>
+            <LogoMark size={76} />
+            <Wordmark size={34} />
+            <Text style={styles.tagline}>Privacy. Confidentiality.</Text>
           </View>
-          <Text style={styles.title}>LandConnect</Text>
+          <View style={styles.container}>
           <Text style={styles.subtitle}>Buy, sell and broker land. Chat and call without sharing your number.</Text>
 
           <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="you@example.com" />
@@ -65,6 +68,7 @@ export default function LoginScreen() {
               ))}
             </View>
           </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -72,11 +76,11 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  container: { padding: 24, paddingTop: 48 },
-  logo: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.primary, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: '700', color: colors.primary, textAlign: 'center', marginTop: 16 },
-  subtitle: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 8, marginBottom: 32, lineHeight: 21 },
+  safe: { flex: 1, backgroundColor: colors.header },
+  hero: { backgroundColor: colors.header, alignItems: 'center', gap: 14, paddingTop: 40, paddingBottom: 44 },
+  tagline: { color: colors.paleMint, fontSize: 14, letterSpacing: 2.5, fontFamily: fonts.heading },
+  container: { flexGrow: 1, padding: 24, backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -20 },
+  subtitle: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 4, marginBottom: 24, lineHeight: 21 },
   error: { color: colors.danger, marginBottom: 12, textAlign: 'center' },
   footer: { textAlign: 'center', marginTop: 20, color: colors.textMuted, fontSize: 15 },
   link: { color: colors.secondary, fontWeight: '600' },

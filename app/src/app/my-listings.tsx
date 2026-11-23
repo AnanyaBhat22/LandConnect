@@ -2,6 +2,7 @@
 import { FlatList, RefreshControl, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ListingCard } from '../components/ListingCard';
 import { Button, EmptyState } from '../components/ui';
@@ -11,6 +12,7 @@ import { colors } from '../theme';
 export default function MyListingsScreen() {
   const { mode } = useLocalSearchParams<{ mode?: 'mine' | 'saved' }>();
   const saved = mode === 'saved';
+  const insets = useSafeAreaInsets();
   const { items, loading, error, reload, toggleFavorite } = useListings(saved ? { favorites: true } : { mine: true });
 
   return (
@@ -19,7 +21,7 @@ export default function MyListingsScreen() {
       <FlatList
         data={items}
         keyExtractor={(l) => l.id}
-        contentContainerStyle={items.length ? { padding: 14, gap: 14 } : { flex: 1 }}
+        contentContainerStyle={items.length ? { padding: 14, gap: 14, paddingBottom: 14 + insets.bottom } : { flex: 1 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} colors={[colors.primary]} />}
         ListEmptyComponent={
           loading ? undefined : (

@@ -3,7 +3,8 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useSocket } from '../../realtime/SocketContext';
-import { colors } from '../../theme';
+import { Wordmark } from '../../components/Brand';
+import { colors, fonts } from '../../theme';
 
 /** Small dot in the header: green when the realtime connection is live. */
 function ConnectionDot() {
@@ -15,9 +16,9 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: colors.primary },
+        headerStyle: { backgroundColor: colors.header },
         headerTintColor: colors.white,
-        headerTitleStyle: { fontWeight: '600' },
+        headerTitleStyle: { fontFamily: fonts.heading },
         headerRight: () => <ConnectionDot />,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
@@ -26,7 +27,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Chats', headerTitle: 'LandConnect', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" color={color as string} size={size} /> }}
+        options={{ title: 'Chats', headerTitle: () => <Wordmark size={21} />, tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" color={color as string} size={size} /> }}
       />
       <Tabs.Screen
         name="community"

@@ -8,6 +8,7 @@ import { ActivityIndicator, Alert, Dimensions, FlatList, Pressable, ScrollView, 
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../../api/client';
 import type { Listing } from '../../api/types';
@@ -33,6 +34,8 @@ function Fact({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; la
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { startCall } = useCalls();
+  // Android draws edge-to-edge (behind the Back/Home bar), so pad by its height.
+  const insets = useSafeAreaInsets();
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [photo, setPhoto] = useState(0);
@@ -116,7 +119,7 @@ export default function ListingDetailScreen() {
             ),
         }}
       />
-      <ScrollView contentContainerStyle={{ paddingBottom: listing.is_owner ? 32 : 110 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: (listing.is_owner ? 32 : 110) + insets.bottom }}>
         {listing.images.length ? (
           <View>
             <FlatList
@@ -199,7 +202,7 @@ export default function ListingDetailScreen() {
       </ScrollView>
 
       {!listing.is_owner && (
-        <View style={styles.contactBar}>
+        <View style={[styles.contactBar, { paddingBottom: 14 + insets.bottom }]}>
           <Pressable style={[styles.contactBtn, styles.chatBtn]} onPress={() => Alert.alert('Chat is coming next', 'Messaging is the next feature being built. For now, call the owner in the app.')}>
             <Ionicons name="chatbubble-ellipses" size={20} color={colors.primary} />
             <Text style={[styles.contactText, { color: colors.primary }]}>Chat</Text>

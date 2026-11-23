@@ -13,14 +13,15 @@ import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { CallProvider } from '../calls/CallContext';
 import { CallOverlay } from '../calls/CallOverlay';
 import { SocketProvider } from '../realtime/SocketContext';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
+import { Comfortaa_600SemiBold, Comfortaa_700Bold, useFonts } from '@expo-google-fonts/comfortaa';
 
-function RootNavigator() {
+function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const { status } = useAuth();
 
-  if (status === 'loading') {
+  if (status === 'loading' || !fontsReady) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.header }}>
         <ActivityIndicator color="white" size="large" />
       </View>
     );
@@ -31,9 +32,9 @@ function RootNavigator() {
     <>
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.primary },
+          headerStyle: { backgroundColor: colors.header },
           headerTintColor: colors.white,
-          headerTitleStyle: { fontWeight: '600' },
+          headerTitleStyle: { fontFamily: fonts.heading },
         }}
       >
         {/* Signed out: any app route (including the home "/") redirects to /login. */}
@@ -55,13 +56,17 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // Fonts ship inside the JS bundle and load via expo-font (already in the
+  // dev build), so adding them needs no native rebuild. If loading fails we
+  // still start, falling back to the system font.
+  const [loaded, error] = useFonts({ Comfortaa_600SemiBold, Comfortaa_700Bold });
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
       <AuthProvider>
         <SocketProvider>
           <CallProvider>
-            <RootNavigator />
+            <RootNavigator fontsReady={loaded || !!error} />
           </CallProvider>
         </SocketProvider>
       </AuthProvider>

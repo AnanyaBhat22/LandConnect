@@ -75,3 +75,10 @@ Each entry records a technical decision when it was made: the context, what we c
   - Expo Router is Expo's recommended navigation for SDK 58, and `Stack.Protected` makes auth gating declarative.
   - An incoming call must appear on whatever screen the user is on and must not be lost on back-navigation; an overlay driven by global state guarantees that.
 - **Trade-off:** The call screen isn't deep-linkable. That's irrelevant for calls.
+
+## D11: Use LandConnect's own visual identity
+- **Date:** 23 Nov 2026
+- **Context:** The first palette copied WhatsApp's greens. The brief asks for a WhatsApp-*inspired* interface, and the reviewers are LandConnect.
+- **Decision:** Keep WhatsApp's familiar *layout* patterns but use LandConnect's colours (taken from their logo and banner), a rounded geometric heading font close to their wordmark (Comfortaa), a simple logo mark drawn in code, and their tagline on the login screen.
+- **Why:** The prototype then looks like *their* product, not a WhatsApp clone. All colours are tokens in `src/theme.ts`, so further brand tweaks touch one file.
+- **Trade-off:** The logo mark is an approximation built from Views rather than their official asset; it would be swapped for the real SVG in production.

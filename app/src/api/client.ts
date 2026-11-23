@@ -111,8 +111,10 @@ export async function uploadFile<T>(path: string, file: { uri: string; name: str
   let res: Response;
   try {
     res = await doFetch();
-  } catch {
-    throw new ApiError(0, `Can't reach the server at ${API_URL}. Check your Wi-Fi.`);
+  } catch (e: any) {
+    // Keep the underlying reason (e.g. "Network request failed"): for uploads
+    // it's usually about the file, not the Wi-Fi.
+    throw new ApiError(0, `Upload didn't reach the server (${e?.message ?? 'unknown error'})`);
   }
   if (res.status === 401 && (await refreshTokens())) res = await doFetch();
   const data = await res.json().catch(() => null);

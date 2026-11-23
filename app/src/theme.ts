@@ -1,30 +1,40 @@
 /**
- * LandConnect palette: earthy and land-inspired (pine, terracotta, sand).
+ * LandConnect brand palette, taken from the company's own logo and banner:
+ * a near-black forest green background, an emerald logo tile, a mint
+ * "Connect" wordmark, a pale-mint shape and a small amber dot.
  *
  * The *layout* follows WhatsApp's familiar patterns (coloured header, tabs,
- * chat bubbles, call screens), but the colours are our own brand, so the app
- * doesn't look like a WhatsApp clone. Call Accept/Decline stay green/red
- * because those meanings are universal.
+ * chat bubbles, call screens); the colours are LandConnect's. Call
+ * Accept/Decline stay green/red because those meanings are universal.
  */
 export const colors = {
-  primary: '#1F3B2F', // deep pine: headers, primary buttons
-  secondary: '#3E7C5A', // field green: links, active toggles, section titles
-  accent: '#D9824B', // terracotta: floating buttons, badges, send
-  sand: '#F5EFE6', // warm background for cards and surfaces
+  header: '#12251E', // brand dark forest: headers, call screens
+  primary: '#167A5B', // brand emerald (logo tile): buttons, prices, active tabs
+  secondary: '#3FAE86', // between emerald and mint: links, toggles, section titles
+  mint: '#5FD1A2', // "Connect" mint: highlights on dark backgrounds
+  paleMint: '#A9D3C3', // logo's second shape
+  accent: '#F2A12E', // the amber dot: floating buttons, badges, send
+  sand: '#EEF6F2', // light mint-tinted surface for cards
   success: '#2FB36D', // accept call, online, outgoing-call arrow
   danger: '#E5484D', // decline, end call, missed
   background: '#FFFFFF',
-  surface: '#F5EFE6',
-  border: '#E8E1D6',
-  text: '#1C1A17',
-  textMuted: '#77706A',
+  surface: '#EEF6F2',
+  border: '#DCE9E3',
+  text: '#13201B',
+  textMuted: '#66756F',
   white: '#FFFFFF',
-  bubbleMine: '#E3EFE6',
-  callBackground: '#101A16',
+  bubbleMine: '#DDF3E9',
+  callBackground: '#0D1C16',
 };
 
 export const roleColors: Record<string, string> = {
   BUYER: '#2B6CB0',
-  SELLER: '#3E7C5A',
+  SELLER: '#167A5B',
   BROKER: '#9C4F96',
+};
+
+/** Rounded geometric face close to the LandConnect wordmark (loaded in the root layout). */
+export const fonts = {
+  brand: 'Comfortaa_700Bold',
+  heading: 'Comfortaa_600SemiBold',
 };

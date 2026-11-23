@@ -10,6 +10,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Sc
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 
 import { api, uploadFile } from '../../api/client';
@@ -19,11 +20,13 @@ import { Button, TextField } from '../../components/ui';
 import { colors } from '../../theme';
 
 const MAX_PHOTOS = 8;
+const SQFT_PER_ACRE = 43560;
 type NewPhoto = { uri: string; name: string; type: string };
 
 export default function EditListingScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = !!id;
+  const insets = useSafeAreaInsets(); // room for Android's nav bar below the Save button
 
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
@@ -32,6 +35,8 @@ export default function EditListingScreen() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [area, setArea] = useState('');
+  // Land is usually described in acres; small plots in sq ft. The API stores sq ft.
+  const [areaUnit, setAreaUnit] = useState<'acres' | 'sqft'>('acres');
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
   const [hideExact, setHideExact] = useState(false);
@@ -46,7 +51,13 @@ export default function EditListingScreen() {
         setTitle(l.title);
         setDescription(l.description);
         setPrice(String(l.price_inr));
-        setArea(l.area_sqft ? String(Math.round(l.area_sqft)) : '');
+        if (l.area_sqft && l.area_sqft >= SQFT_PER_ACRE / 2) {
+          setAreaUnit('acres');
+          setArea(String(Number((l.area_sqft / SQFT_PER_ACRE).toFixed(2))));
+        } else {
+          setAreaUnit('sqft');
+          setArea(l.area_sqft ? String(Math.round(l.area_sqft)) : '');
+        }
         setCity(l.city ?? '');
         setAddress(l.address ?? '');
         setHideExact(l.hide_exact_location);
@@ -95,7 +106,8 @@ export default function EditListingScreen() {
 
   const save = async () => {
     const priceNum = Number(price.replace(/[^0-9]/g, ''));
-    const areaNum = area ? Number(area.replace(/[^0-9.]/g, '')) : null;
+    const areaValue = area ? Number(area.replace(/[^0-9.]/g, '')) : null;
+    const areaNum = areaValue ? (areaUnit === 'acres' ? areaValue * SQFT_PER_ACRE : areaValue) : null;
     if (title.trim().length < 4) return Alert.alert('Add a title', 'At least 4 characters, e.g. "2 acre farmland near Lonavala".');
     if (!priceNum) return Alert.alert('Add a price', 'Enter the asking price in rupees.');
     if (!place) return Alert.alert('Set the location', 'Move the map so the pin is on the plot, or use your current location.');
@@ -118,15 +130,20 @@ export default function EditListingScreen() {
         ? await api<Listing>(`/listings/${id}`, { method: 'PATCH', body })
         : await api<Listing>('/listings', { method: 'POST', body });
       let failed = 0;
+      let lastError = '';
+      console.log(`[listing] saved ${saved.id}; uploading ${photos.length} photo(s)`);
       for (let i = 0; i < photos.length; i++) {
         setProgress(`Uploading photo ${i + 1} of ${photos.length}…`);
         try {
           await uploadFile(`/listings/${saved.id}/images`, photos[i]);
-        } catch {
+        } catch (e: any) {
           failed++;
+          lastError = e?.message ?? String(e);
+          // Visible in the dev server log, so failures are never silent.
+          console.warn('[listing] photo upload failed', { uri: photos[i].uri, type: photos[i].type, error: lastError });
         }
       }
-      if (failed) Alert.alert('Some photos failed', `${failed} photo(s) couldn't be uploaded. You can add them again from Edit.`);
+      if (failed) Alert.alert('Some photos failed', `${failed} of ${photos.length} photo(s) couldn't be uploaded.\n\nReason: ${lastError}\n\nYou can add them again from Edit.`);
       router.replace({ pathname: '/listing/[id]', params: { id: saved.id } });
     } catch (e: any) {
       Alert.alert('Could not save', e.message);
@@ -147,7 +164,7 @@ export default function EditListingScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ title: editing ? 'Edit listing' : 'List your land' }} />
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 48 + insets.bottom }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.section}>Photos</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
           {existing.map((img) => (
@@ -188,7 +205,32 @@ export default function EditListingScreen() {
             <TextField label="Price (₹)" value={price} onChangeText={setPrice} keyboardType="number-pad" placeholder="4500000" />
           </View>
           <View style={{ flex: 1 }}>
-            <TextField label="Area (sq ft)" value={area} onChangeText={setArea} keyboardType="decimal-pad" placeholder="87120" />
+            <TextField
+              label={`Area (${areaUnit === 'acres' ? 'acres' : 'sq ft'})`}
+              value={area}
+              onChangeText={setArea}
+              keyboardType="decimal-pad"
+              placeholder={areaUnit === 'acres' ? '2.5' : '2400'}
+            />
+          </View>
+        </View>
+        <View style={styles.unitRow}>
+          <Text style={styles.hint}>Area unit</Text>
+          <View style={styles.unitToggle}>
+            {(['acres', 'sqft'] as const).map((u) => (
+              <Pressable
+                key={u}
+                onPress={() => {
+                  // Convert the number already typed so switching units doesn't change the size.
+                  const n = Number(area.replace(/[^0-9.]/g, ''));
+                  if (n && u !== areaUnit) setArea(u === 'sqft' ? String(Math.round(n * SQFT_PER_ACRE)) : String(Number((n / SQFT_PER_ACRE).toFixed(3))));
+                  setAreaUnit(u);
+                }}
+                style={[styles.unitBtn, areaUnit === u && styles.unitActive]}
+              >
+                <Text style={[styles.unitText, areaUnit === u && { color: 'white' }]}>{u === 'acres' ? 'Acres' : 'Sq ft'}</Text>
+              </Pressable>
+            ))}
           </View>
         </View>
         <TextField
@@ -242,4 +284,9 @@ const styles = StyleSheet.create({
   privacy: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.sand, padding: 14, borderRadius: 12, marginTop: 4, marginBottom: 12 },
   privacyTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
   progress: { textAlign: 'center', color: colors.secondary, marginBottom: 8 },
+  unitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -6, marginBottom: 14 },
+  unitToggle: { flexDirection: 'row', borderRadius: 16, borderWidth: 1.5, borderColor: colors.primary, overflow: 'hidden' },
+  unitBtn: { paddingHorizontal: 16, paddingVertical: 6 },
+  unitActive: { backgroundColor: colors.primary },
+  unitText: { fontSize: 13, fontWeight: '600', color: colors.primary },
 });
