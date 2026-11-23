@@ -51,7 +51,7 @@ export default function ProfileScreen() {
             value={user.show_online_status}
             disabled={saving}
             onValueChange={(v) => save({ show_online_status: v })}
-            trackColor={{ true: colors.accent }}
+            trackColor={{ true: colors.secondary }}
           />
         </View>
         <View style={[styles.row, { alignItems: 'flex-start' }]}>
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 20, backgroundColor: colors.white },
   name: { fontSize: 20, fontWeight: '600', color: colors.text },
   muted: { fontSize: 13, color: colors.textMuted },
-  section: { fontSize: 14, fontWeight: '600', color: colors.teal, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 },
+  section: { fontSize: 14, fontWeight: '600', color: colors.secondary, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 },
   group: { backgroundColor: colors.white },
   row: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowTitle: { fontSize: 16, color: colors.text },

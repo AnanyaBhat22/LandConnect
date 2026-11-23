@@ -8,7 +8,7 @@ import { colors } from '../../theme';
 export default function ChatsScreen() {
   return (
     <EmptyState
-      icon={<Ionicons name="chatbubbles-outline" size={64} color={colors.teal} />}
+      icon={<Ionicons name="chatbubbles-outline" size={64} color={colors.secondary} />}
       title="Chats are coming next"
       subtitle="Messaging lands in the next step. Meanwhile, you can find people and call them in the app."
     >

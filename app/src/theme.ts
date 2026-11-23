@@ -1,20 +1,30 @@
-/** WhatsApp-inspired palette, so the app feels familiar from the first screen. */
+/**
+ * LandConnect palette: earthy and land-inspired (pine, terracotta, sand).
+ *
+ * The *layout* follows WhatsApp's familiar patterns (coloured header, tabs,
+ * chat bubbles, call screens), but the colours are our own brand, so the app
+ * doesn't look like a WhatsApp clone. Call Accept/Decline stay green/red
+ * because those meanings are universal.
+ */
 export const colors = {
-  primary: '#075E54', // header green
-  teal: '#128C7E',
-  accent: '#25D366', // action green (accept, send, FAB)
-  danger: '#E53935', // decline, end call, missed
+  primary: '#1F3B2F', // deep pine: headers, primary buttons
+  secondary: '#3E7C5A', // field green: links, active toggles, section titles
+  accent: '#D9824B', // terracotta: floating buttons, badges, send
+  sand: '#F5EFE6', // warm background for cards and surfaces
+  success: '#2FB36D', // accept call, online, outgoing-call arrow
+  danger: '#E5484D', // decline, end call, missed
   background: '#FFFFFF',
-  surface: '#F0F2F5',
-  border: '#E4E6EB',
-  text: '#111B21',
-  textMuted: '#667781',
+  surface: '#F5EFE6',
+  border: '#E8E1D6',
+  text: '#1C1A17',
+  textMuted: '#77706A',
   white: '#FFFFFF',
-  callBackground: '#0B141A',
+  bubbleMine: '#E3EFE6',
+  callBackground: '#101A16',
 };
 
 export const roleColors: Record<string, string> = {
-  BUYER: '#1E88E5',
-  SELLER: '#43A047',
-  BROKER: '#8E24AA',
+  BUYER: '#2B6CB0',
+  SELLER: '#3E7C5A',
+  BROKER: '#9C4F96',
 };

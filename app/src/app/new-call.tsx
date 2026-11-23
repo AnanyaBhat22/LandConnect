@@ -57,7 +57,7 @@ export default function NewCallScreen() {
         contentContainerStyle={results.length === 0 ? { flex: 1 } : undefined}
         ListEmptyComponent={
           <EmptyState
-            icon={<Ionicons name="people-outline" size={56} color={colors.teal} />}
+            icon={<Ionicons name="people-outline" size={56} color={colors.secondary} />}
             title={error ?? (query.trim().length < 2 ? 'Find buyers, sellers and brokers' : loading ? 'Searching…' : 'No one found')}
             subtitle="Try a demo account: Asha, Ravi or Meera"
           />

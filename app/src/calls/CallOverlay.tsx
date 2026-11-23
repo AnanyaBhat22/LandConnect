@@ -22,6 +22,7 @@ import { ConnectionError, LocalVideoTrack, Track } from 'livekit-client';
 import { Avatar, RoleBadge } from '../components/ui';
 import { colors } from '../theme';
 import { CallState, useCalls } from './CallContext';
+import { InCallChatPanel, useInCallChat } from './InCallChat';
 
 export function CallOverlay() {
   const { state } = useCalls();
@@ -69,7 +70,7 @@ function IncomingView({ state }: { state: Extract<CallState, { phase: 'incoming'
       <CallerHeader state={state} subtitle={`Incoming ${state.kind === 'VIDEO' ? 'video' : 'voice'} call`} />
       <View style={styles.actions}>
         <RoundButton icon="close" color={colors.danger} onPress={reject} label="Decline" />
-        <RoundButton icon={state.kind === 'VIDEO' ? 'videocam' : 'call'} color={colors.accent} onPress={accept} label="Accept" />
+        <RoundButton icon={state.kind === 'VIDEO' ? 'videocam' : 'call'} color={colors.success} onPress={accept} label="Accept" />
       </View>
     </SafeAreaView>
   );
@@ -155,15 +156,24 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
   const { hangup } = useCalls();
   const connection = useConnectionState();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
-  const tracks = useTracks([Track.Source.Camera]);
+  // Camera AND screen-share tracks: if the other person shares their screen
+  // (e.g. a site plan or documents), the viewer must see it, not just the sharer.
+  const tracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare]);
   const timer = useTimer(state.startedAt);
   const [speaker, setSpeaker] = useState(state.kind === 'VIDEO');
   const [frontCamera, setFrontCamera] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const chat = useInCallChat(chatOpen);
 
-  const remote = tracks.find((t) => !t.participant.isLocal);
-  const local = tracks.find((t) => t.participant.isLocal);
-  const isVideo = state.kind === 'VIDEO';
-  const remoteVideo = remote && isTrackReference(remote) && !remote.publication.isMuted;
+  const isLive = (t: (typeof tracks)[number] | undefined) => !!t && isTrackReference(t) && !t.publication.isMuted;
+  const remoteScreen = tracks.find((t) => !t.participant.isLocal && t.source === Track.Source.ScreenShare && isLive(t));
+  const remoteCamera = tracks.find((t) => !t.participant.isLocal && t.source === Track.Source.Camera);
+  const remote = remoteScreen ?? remoteCamera; // a shared screen takes the main view
+  const local = tracks.find((t) => t.participant.isLocal && t.source === Track.Source.Camera);
+  const sharing = !!remoteScreen;
+  // Screen shares show even in voice calls, since they're explicitly shared content.
+  const isVideo = state.kind === 'VIDEO' || sharing;
+  const remoteVideo = isLive(remote);
 
   // Video calls default to loudspeaker, voice calls to the earpiece (like WhatsApp).
   useEffect(() => {
@@ -194,8 +204,9 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
 
   return (
     <View style={styles.activeScreen}>
-      {isVideo && remoteVideo ? (
-        <VideoTrack trackRef={remote} style={StyleSheet.absoluteFill} objectFit="cover" />
+      {isVideo && remoteVideo && remote && isTrackReference(remote) ? (
+        // 'contain' for screens so documents aren't cropped; 'cover' for faces.
+        <VideoTrack trackRef={remote} style={StyleSheet.absoluteFill} objectFit={sharing ? 'contain' : 'cover'} />
       ) : (
         <SafeAreaView style={styles.screen}>
           <CallerHeader state={state} subtitle={status} />
@@ -205,7 +216,7 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
       {isVideo && remoteVideo && (
         <SafeAreaView style={styles.videoTopBar} edges={['top']}>
           <Text style={styles.videoName}>{state.peer.name}</Text>
-          <Text style={styles.videoTimer}>{status}</Text>
+          <Text style={styles.videoTimer}>{sharing ? `${timer} · sharing their screen` : status}</Text>
         </SafeAreaView>
       )}
 
@@ -215,18 +226,30 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
 
       <SafeAreaView style={styles.controlsBar} edges={['bottom']}>
         <View style={styles.controls}>
-          <RoundButton size={54} icon={speaker ? 'volume-high' : 'volume-low'} color={speaker ? colors.teal : 'rgba(255,255,255,0.18)'} onPress={() => setSpeaker((s) => !s)} />
-          {isVideo && (
-            <RoundButton size={54} icon={isCameraEnabled ? 'videocam' : 'videocam-off'} color={isCameraEnabled ? 'rgba(255,255,255,0.18)' : colors.teal} onPress={() => localParticipant.setCameraEnabled(!isCameraEnabled)} />
+          <RoundButton size={50} icon={speaker ? 'volume-high' : 'volume-low'} color={speaker ? colors.secondary : OFF} onPress={() => setSpeaker((s) => !s)} />
+          {state.kind === 'VIDEO' && (
+            <RoundButton size={50} icon={isCameraEnabled ? 'videocam' : 'videocam-off'} color={isCameraEnabled ? OFF : colors.secondary} onPress={() => localParticipant.setCameraEnabled(!isCameraEnabled)} />
           )}
-          {isVideo && <RoundButton size={54} icon="camera-reverse" color="rgba(255,255,255,0.18)" onPress={flipCamera} />}
-          <RoundButton size={54} icon={isMicrophoneEnabled ? 'mic' : 'mic-off'} color={isMicrophoneEnabled ? 'rgba(255,255,255,0.18)' : colors.teal} onPress={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)} />
-          <RoundButton size={54} icon="call" color={colors.danger} onPress={hangup} />
+          {state.kind === 'VIDEO' && <RoundButton size={50} icon="camera-reverse" color={OFF} onPress={flipCamera} />}
+          <RoundButton size={50} icon={isMicrophoneEnabled ? 'mic' : 'mic-off'} color={isMicrophoneEnabled ? OFF : colors.secondary} onPress={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)} />
+          <View>
+            <RoundButton size={50} icon="chatbubble-ellipses" color={chatOpen ? colors.secondary : OFF} onPress={() => setChatOpen((o) => !o)} />
+            {chat.unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{chat.unread > 9 ? '9+' : chat.unread}</Text>
+              </View>
+            )}
+          </View>
+          <RoundButton size={50} icon="call" color={colors.danger} onPress={hangup} />
         </View>
       </SafeAreaView>
+
+      {chatOpen && <InCallChatPanel chat={chat} onClose={() => setChatOpen(false)} />}
     </View>
   );
 }
+
+const OFF = 'rgba(255,255,255,0.18)';
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.callBackground, justifyContent: 'space-between' },
@@ -245,4 +268,6 @@ const styles = StyleSheet.create({
   selfView: { position: 'absolute', top: 110, right: 16, width: 110, height: 165, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   controlsBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17,27,33,0.85)', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   controls: { flexDirection: 'row', justifyContent: 'space-evenly', paddingVertical: 18 },
+  badge: { position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { color: 'white', fontSize: 11, fontWeight: '700' },
 });

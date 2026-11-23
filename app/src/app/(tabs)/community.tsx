@@ -7,7 +7,7 @@ import { colors } from '../../theme';
 export default function CommunityScreen() {
   return (
     <EmptyState
-      icon={<Ionicons name="map-outline" size={64} color={colors.teal} />}
+      icon={<Ionicons name="map-outline" size={64} color={colors.secondary} />}
       title="Land listings are coming soon"
       subtitle="Browse plots with photos, prices and locations on a map."
     />

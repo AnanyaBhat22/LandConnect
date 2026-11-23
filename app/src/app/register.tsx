@@ -74,7 +74,7 @@ export default function RegisterScreen() {
           <TextField label="Password (min 8 characters)" value={password} onChangeText={setPassword} secureTextEntry placeholder="••••••••" />
           <TextField label="Phone (optional, kept private)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+91…" />
           <View style={styles.privacy}>
-            <Ionicons name="lock-closed" size={14} color={colors.teal} />
+            <Ionicons name="lock-closed" size={14} color={colors.secondary} />
             <Text style={styles.privacyText}>Your email and phone are never shown to other users. People reach you through in-app chat and calls only.</Text>
           </View>
 

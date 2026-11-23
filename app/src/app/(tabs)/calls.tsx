@@ -60,7 +60,7 @@ export default function CallsScreen() {
         ListEmptyComponent={
           loading ? undefined : (
             <EmptyState
-              icon={<Ionicons name="call-outline" size={64} color={colors.teal} />}
+              icon={<Ionicons name="call-outline" size={64} color={colors.secondary} />}
               title={error ?? 'No calls yet'}
               subtitle={error ? 'Pull down to retry.' : 'Tap the button below to call someone. Your number is never shared.'}
             />
@@ -75,7 +75,7 @@ export default function CallsScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.name, missed && { color: colors.danger }]}>{item.peer.name}</Text>
                 <View style={styles.meta}>
-                  <Ionicons name={arrow} size={14} color={missed ? colors.danger : colors.accent} style={{ transform: [{ rotate: '45deg' }] }} />
+                  <Ionicons name={arrow} size={14} color={missed ? colors.danger : colors.success} style={{ transform: [{ rotate: '45deg' }] }} />
                   <Text style={styles.metaText}>
                     {when(item.created_at)}
                     {item.status === 'COMPLETED' ? duration(item.duration_seconds) : ` · ${item.status.toLowerCase()}`}

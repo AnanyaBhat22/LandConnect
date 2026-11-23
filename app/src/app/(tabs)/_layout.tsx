@@ -8,7 +8,7 @@ import { colors } from '../../theme';
 /** Small dot in the header: green when the realtime connection is live. */
 function ConnectionDot() {
   const { connected } = useSocket();
-  return <View style={{ width: 10, height: 10, borderRadius: 5, marginRight: 16, backgroundColor: connected ? colors.accent : '#FFB02E' }} />;
+  return <View style={{ width: 10, height: 10, borderRadius: 5, marginRight: 16, backgroundColor: connected ? colors.success : '#FFB02E' }} />;
 }
 
 export default function TabsLayout() {
