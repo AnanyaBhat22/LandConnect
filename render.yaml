@@ -1,0 +1,33 @@
+# Render Blueprint: one-click deploy of the LandConnect backend.
+# Render → New → Blueprint → pick this repo. Secrets (sync: false) are
+# entered once in the Render dashboard and never stored in git.
+services:
+  - type: web
+    name: landconnect-api
+    runtime: python
+    plan: free
+    rootDir: server
+    buildCommand: pip install -r requirements.txt
+    # Apply DB migrations, then start ONE worker: active calls are tracked in
+    # memory, so all sockets must reach the same process (see DECISIONS D9).
+    startCommand: alembic upgrade head && uvicorn app.main:asgi --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
