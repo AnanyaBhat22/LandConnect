@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.realtime import sio
-from app.routers import auth, calls, chats, listings, users
+from app.routers import auth, calls, chats, listings, meetings, users
 
 app = FastAPI(
     title="LandConnect API",
@@ -34,6 +34,7 @@ app.include_router(users.router)
 app.include_router(calls.router)
 app.include_router(listings.router)
 app.include_router(chats.router)
+app.include_router(meetings.router)
 
 
 @app.get("/health", tags=["meta"])

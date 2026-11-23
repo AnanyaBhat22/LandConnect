@@ -198,6 +198,16 @@ class MeetingRoom(Base):
     created_at: Mapped[datetime] = _created_at()
 
 
+class MeetingInvite(Base):
+    """Who may join a meeting room (besides the host)."""
+
+    __tablename__ = "meeting_invites"
+
+    meeting_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("meeting_rooms.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    created_at: Mapped[datetime] = _created_at()
+
+
 class CallLog(Base):
     __tablename__ = "call_logs"
 
