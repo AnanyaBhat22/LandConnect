@@ -37,6 +37,7 @@ def live_server(session_factory, monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
     monkeypatch.setattr(realtime.calls, "session_factory", session_factory)
     monkeypatch.setattr(realtime.calls, "ring_timeout", 5.0)
+    monkeypatch.setattr(realtime.calls, "close_room", None)  # never call LiveKit from tests
 
     port = _free_port()
     server = uvicorn.Server(uvicorn.Config(asgi, host="127.0.0.1", port=port, log_level="warning"))

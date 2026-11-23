@@ -99,8 +99,11 @@ class CallManager:
         is_online: Callable[[uuid.UUID], bool],
         ring_timeout: float = 30.0,
         disconnect_grace: float = 20.0,
+        close_room: Callable[[str], Awaitable[None]] | None = None,
     ):
         self.emit = emit
+        # Injected so tests never talk to LiveKit; production passes livekit.close_room.
+        self.close_room = close_room
         self.session_factory = session_factory
         self.is_online = is_online
         self.ring_timeout = ring_timeout
@@ -327,3 +330,7 @@ class CallManager:
             await self.emit("call:ended", payload, uid)
             if chat_msg:
                 await self.emit("message:new", chat_msg, uid)
+        if status == CallStatus.COMPLETED and self.close_room:
+            # The call was answered, so a media room exists: close it so neither
+            # side (nor anyone holding a token) can stay in it after hang-up.
+            asyncio.create_task(self.close_room(call_room_name(call.id)))

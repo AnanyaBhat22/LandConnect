@@ -15,7 +15,7 @@
     "android": {
       "package": "com.landconnect.prototype",
       "adaptiveIcon": {
-        "backgroundColor": "#12251E",
+        "backgroundColor": "#167A5B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -57,7 +57,15 @@
       "expo-secure-store",
       "expo-image",
       "@maplibre/maplibre-react-native",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#12251E",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 150
+        }
+      ]
     ],
     "extra": {
       "eas": {

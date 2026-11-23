@@ -62,7 +62,7 @@ export function PhotoGallery({ images }: { images: ListingImage[] }) {
   );
 }
 
-function FullScreenViewer({ images, start, onClose }: { images: ListingImage[]; start: number; onClose: () => void }) {
+export function FullScreenViewer({ images, start, onClose }: { images: ListingImage[]; start: number; onClose: () => void }) {
   const [index, setIndex] = useState(start);
   const insets = useSafeAreaInsets();
   return (

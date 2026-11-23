@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime
 
 from anyio.from_thread import run as run_async
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ from app.db import get_db
 from app.models import Conversation, Listing, Message, MessageType, Participant, User
 from app.schemas import ORMModel, UserPublic
 from app.services import chat as chat_service
+from app.services import images as image_store
 from app.services.calls import is_blocked_either_way
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
@@ -186,6 +187,34 @@ def send_message(conversation_id: uuid.UUID, body: SendIn, user: User = Depends(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Message is empty")
     msg = chat_service.add_message(db, conv, user.id, text)
     me.last_read_at = msg.created_at  # my own message means I've seen everything before it
+    db.commit()
+    db.refresh(msg)
+    _push("message:new", chat_service.message_payload(msg), [user.id, peer.user_id])
+    return msg
+
+
+@router.post("/{conversation_id}/images", response_model=MessageOut, status_code=status.HTTP_201_CREATED)
+def send_image(
+    conversation_id: uuid.UUID,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Message:
+    """Send a picture: checked like listing photos, stored on Cloudinary, sent as an IMAGE message."""
+    conv, me, peer = _membership(db, conversation_id, user)
+    if is_blocked_either_way(db, user.id, peer.user_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can't message this user")
+    if file.content_type not in image_store.ALLOWED_TYPES:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Send a JPEG, PNG, WebP or HEIC photo")
+    data = file.file.read(image_store.MAX_BYTES + 1)
+    if len(data) > image_store.MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Photo is larger than 8 MB")
+    try:
+        stored = image_store.upload_chat_image(data, str(conv.id))
+    except Exception:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Photo upload failed, please try again")
+    msg = chat_service.add_message(db, conv, user.id, stored.url, MessageType.IMAGE)
+    me.last_read_at = msg.created_at
     db.commit()
     db.refresh(msg)
     _push("message:new", chat_service.message_payload(msg), [user.id, peer.user_id])

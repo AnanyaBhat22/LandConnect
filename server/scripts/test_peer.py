@@ -64,7 +64,9 @@ async def run(args: argparse.Namespace) -> None:
         await http.post(f"/conversations/{conv}/read")  # turns the phone's ticks blue
         await asyncio.sleep(1)
         await sio.emit("typing", {"conversation_id": conv})  # phone shows "typing…"
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(2)
+        await sio.emit("typing", {"conversation_id": conv})  # keep the indicator alive while "typing"
+        await asyncio.sleep(3)
         reply = f"Thanks! You said: “{msg['body'][:80]}”. Happy to arrange a site visit."
         await http.post(f"/conversations/{conv}/messages", json={"body": reply})
         print(f"   ↩ replied")

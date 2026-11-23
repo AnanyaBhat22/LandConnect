@@ -32,10 +32,18 @@ def _configure() -> None:
 
 
 def upload_listing_image(data: bytes, listing_id: str) -> StoredImage:
+    return upload_image(data, f"landconnect/listings/{listing_id}")
+
+
+def upload_chat_image(data: bytes, conversation_id: str) -> StoredImage:
+    return upload_image(data, f"landconnect/chats/{conversation_id}")
+
+
+def upload_image(data: bytes, folder: str) -> StoredImage:
     _configure()
     result = cloudinary.uploader.upload(
         data,
-        folder=f"landconnect/listings/{listing_id}",
+        folder=folder,
         resource_type="image",
         # Store a sensible max size and let Cloudinary pick format/quality per device.
         transformation=[{"width": 1600, "height": 1600, "crop": "limit"}, {"quality": "auto", "fetch_format": "auto"}],

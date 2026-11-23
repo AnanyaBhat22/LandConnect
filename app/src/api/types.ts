@@ -79,7 +79,7 @@ export type ListingInput = Pick<
   'title' | 'description' | 'price_inr' | 'area_sqft' | 'latitude' | 'longitude' | 'address' | 'city' | 'hide_exact_location'
 >;
 
-export type MessageType = 'TEXT' | 'SYSTEM' | 'CALL_LOG';
+export type MessageType = 'TEXT' | 'SYSTEM' | 'CALL_LOG' | 'IMAGE';
 
 export interface ChatMessage {
   id: string;

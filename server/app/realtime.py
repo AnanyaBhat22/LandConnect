@@ -23,6 +23,7 @@ from app.core.deps import user_from_access_token
 from app.db import SessionLocal
 from app.models import CallKind
 from app.services.calls import CallError, CallManager
+from app.services.livekit import close_room
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 
@@ -42,7 +43,7 @@ async def emit_to_user(event: str, data: dict[str, Any], user_id: uuid.UUID) -> 
     await sio.emit(event, data, room=user_room(user_id))
 
 
-calls = CallManager(emit=emit_to_user, session_factory=SessionLocal, is_online=is_online)
+calls = CallManager(emit=emit_to_user, session_factory=SessionLocal, is_online=is_online, close_room=close_room)
 
 
 async def _user_id(sid: str) -> uuid.UUID:

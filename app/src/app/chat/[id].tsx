@@ -7,20 +7,23 @@
  * it fails. New messages arrive over the socket (message:new).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { api } from '../../api/client';
+import { api, uploadFile } from '../../api/client';
 import type { ChatMessage, Conversation } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { useCalls } from '../../calls/CallContext';
 import { dayLabel, describeCall, timeLabel } from '../../chat/format';
 import { useUnread } from '../../chat/UnreadContext';
+import { FullScreenViewer } from '../../components/PhotoGallery';
 import { Avatar } from '../../components/ui';
 import { formatPrice } from '../../lib/format';
+import { useKeyboardHeight } from '../../lib/useKeyboardHeight';
 import { useSocket } from '../../realtime/SocketContext';
 import { colors, fonts } from '../../theme';
 
@@ -34,6 +37,7 @@ export default function ChatScreen() {
   const { startCall } = useCalls();
   const { refresh: refreshUnread } = useUnread();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
 
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]); // oldest → newest
@@ -43,6 +47,8 @@ export default function ChatScreen() {
   const [peerTyping, setPeerTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
+  const pendingFiles = useRef<Record<string, { uri: string; name: string; type: string }>>({}); // for retrying failed pictures
+  const [viewing, setViewing] = useState<string | null>(null); // full-screen picture
   const myId = user?.id ?? '';
 
   const markRead = useCallback(() => {
@@ -121,6 +127,49 @@ export default function ChatScreen() {
     }
   };
 
+  /** Pictures: shown instantly from the local file, uploaded via XHR (see uploadFile), then swapped for the server copy. */
+  const sendImage = async (file: { uri: string; name: string; type: string }, retryId?: string) => {
+    const tempId = retryId ?? `temp-img-${Date.now()}`;
+    pendingFiles.current[tempId] = file;
+    const optimistic: ChatMessage = { id: tempId, conversation_id: id, sender_id: myId, type: 'IMAGE', body: file.uri, created_at: new Date().toISOString(), pending: 'sending' };
+    setMessages((list) => (retryId ? list.map((m) => (m.id === retryId ? optimistic : m)) : [...list, optimistic]));
+    try {
+      const saved = await uploadFile<ChatMessage>(`/conversations/${id}/images`, file);
+      delete pendingFiles.current[tempId];
+      setMessages((list) => {
+        const withoutTemp = list.filter((m) => m.id !== tempId);
+        return withoutTemp.some((m) => m.id === saved.id) ? withoutTemp : [...withoutTemp, saved];
+      });
+    } catch (e: any) {
+      console.warn('[chat] picture upload failed', e?.message);
+      setMessages((list) => list.map((m) => (m.id === tempId ? { ...m, pending: 'failed' } : m)));
+    }
+  };
+
+  const pickImage = () =>
+    Alert.alert('Send a photo', undefined, [
+      { text: 'Camera', onPress: () => choose('camera') },
+      { text: 'Gallery', onPress: () => choose('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+
+  const choose = async (source: 'camera' | 'library') => {
+    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return Alert.alert('Camera permission', 'Allow camera access to take photos.');
+    }
+    const result = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
+    if (result.canceled || !result.assets[0]) return;
+    const a = result.assets[0];
+    sendImage({ uri: a.uri, name: a.fileName ?? `chat-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg' });
+  };
+
+  const retry = (m: ChatMessage) => {
+    if (m.type === 'IMAGE' && pendingFiles.current[m.id]) sendImage(pendingFiles.current[m.id], m.id);
+    else send(m.body, m.id);
+  };
+
   const submit = () => {
     const body = text.trim();
     if (!body) return;
@@ -170,7 +219,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.sand }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+    <View style={{ flex: 1, backgroundColor: colors.sand }}>
       {header}
       {conv.listing && (
         <Pressable style={styles.listingBar} onPress={() => router.push({ pathname: '/listing/[id]', params: { id: conv.listing!.id } })}>
@@ -199,6 +248,8 @@ export default function ChatScreen() {
         inverted
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ padding: 12, gap: 4 }}
+        // Inverted list: the "header" renders at the bottom, right above the input.
+        ListHeaderComponent={peerTyping ? <TypingBubble /> : undefined}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={styles.empty}>🔒 Messages stay inside LandConnect. Neither side sees the other's phone number or email.</Text>
@@ -215,13 +266,17 @@ export default function ChatScreen() {
                   <Text style={styles.dayText}>{dayLabel(item.created_at)}</Text>
                 </View>
               )}
-              <MessageRow msg={item} myId={myId} readByPeer={new Date(item.created_at).getTime() <= peerReadAt} onRetry={() => send(item.body, item.id)} />
+              <MessageRow msg={item} myId={myId} readByPeer={new Date(item.created_at).getTime() <= peerReadAt} onRetry={() => retry(item)} onOpenImage={setViewing} />
             </View>
           );
         }}
       />
 
-      <View style={[styles.inputBar, { paddingBottom: 8 + insets.bottom }]}>
+      {/* Keyboard open: sit right above it. Closed: clear Android's nav bar. */}
+      <View style={[styles.inputBar, { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 8 : 8 + insets.bottom }]}>
+        <Pressable style={styles.attach} onPress={pickImage} hitSlop={6}>
+          <Ionicons name="attach" size={24} color={colors.textMuted} style={{ transform: [{ rotate: '45deg' }] }} />
+        </Pressable>
         <TextInput
           style={styles.input}
           value={text}
@@ -235,11 +290,28 @@ export default function ChatScreen() {
           <Ionicons name="send" size={20} color="white" />
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+      {viewing && <FullScreenViewer images={[{ id: viewing, url: viewing, position: 0 }]} start={0} onClose={() => setViewing(null)} />}
+    </View>
   );
 }
 
-function MessageRow({ msg, myId, readByPeer, onRetry }: { msg: ChatMessage; myId: string; readByPeer: boolean; onRetry: () => void }) {
+/** Three dots pulsing in turn, like WhatsApp's "typing" bubble. */
+function TypingBubble() {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setStep((s) => (s + 1) % 3), 400);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <View style={[styles.bubble, styles.theirs, styles.typingBubble]}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={[styles.typingDot, i === step && { opacity: 1, transform: [{ translateY: -2 }] }]} />
+      ))}
+    </View>
+  );
+}
+
+function MessageRow({ msg, myId, readByPeer, onRetry, onOpenImage }: { msg: ChatMessage; myId: string; readByPeer: boolean; onRetry: () => void; onOpenImage: (url: string) => void }) {
   if (msg.type === 'SYSTEM') {
     return (
       <View style={styles.systemPill}>
@@ -259,9 +331,18 @@ function MessageRow({ msg, myId, readByPeer, onRetry }: { msg: ChatMessage; myId
     );
   }
   const mine = msg.sender_id === myId;
+  const isImage = msg.type === 'IMAGE';
   return (
-    <Pressable disabled={msg.pending !== 'failed'} onPress={onRetry} style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-      <Text style={styles.body}>{msg.body}</Text>
+    <Pressable
+      disabled={!isImage && msg.pending !== 'failed'}
+      onPress={msg.pending === 'failed' ? onRetry : isImage ? () => onOpenImage(msg.body) : undefined}
+      style={[styles.bubble, mine ? styles.mine : styles.theirs, isImage && styles.imageBubble]}
+    >
+      {isImage ? (
+        <Image source={{ uri: msg.body }} style={[styles.chatImage, msg.pending === 'sending' && { opacity: 0.6 }]} contentFit="cover" transition={150} />
+      ) : (
+        <Text style={styles.body}>{msg.body}</Text>
+      )}
       <View style={styles.metaRow}>
         <Text style={styles.time}>{timeLabel(msg.created_at)}</Text>
         {mine &&
@@ -304,4 +385,9 @@ const styles = StyleSheet.create({
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 10, paddingTop: 8, backgroundColor: colors.sand },
   input: { flex: 1, minHeight: 46, maxHeight: 120, borderRadius: 23, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: colors.white, color: colors.text, fontSize: 15 },
   send: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  attach: { width: 40, height: 46, alignItems: 'center', justifyContent: 'center' },
+  imageBubble: { padding: 4, paddingBottom: 4 },
+  chatImage: { width: 220, height: 220, borderRadius: 10 },
+  typingBubble: { flexDirection: 'row', gap: 5, paddingVertical: 14, paddingHorizontal: 16 },
+  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.textMuted, opacity: 0.4 },
 });

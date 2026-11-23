@@ -19,6 +19,18 @@ def meeting_room_name(meeting_id: object) -> str:
     return f"meeting_{meeting_id}"
 
 
+async def close_room(room: str) -> None:
+    """Delete a room so nobody can linger in a call after it ended (best effort)."""
+    http_url = settings.livekit_url.replace("wss://", "https://").replace("ws://", "http://")
+    lk = api.LiveKitAPI(http_url, settings.livekit_api_key, settings.livekit_api_secret)
+    try:
+        await lk.room.delete_room(api.DeleteRoomRequest(room=room))
+    except Exception:  # noqa: BLE001 - room may already be gone; never block hang-up on this
+        pass
+    finally:
+        await lk.aclose()
+
+
 def create_join_token(*, identity: str, name: str, room: str, ttl: timedelta = timedelta(hours=2)) -> str:
     return (
         api.AccessToken(settings.livekit_api_key, settings.livekit_api_secret)

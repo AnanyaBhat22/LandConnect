@@ -163,6 +163,7 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
   const [speaker, setSpeaker] = useState(state.kind === 'VIDEO');
   const [frontCamera, setFrontCamera] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
+  const [controlsShown, setControlsShown] = useState(true);
   const chat = useInCallChat(chatOpen);
 
   const isLive = (t: (typeof tracks)[number] | undefined) => !!t && isTrackReference(t) && !t.publication.isMuted;
@@ -202,18 +203,28 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
           ? `${timer} · ${firstName}'s camera is off`
           : timer;
 
+  // With video on screen, a tap hides/shows the bars (as in WhatsApp) so
+  // nothing covers the picture. With no video there's nothing to uncover.
+  const showingVideo = isVideo && remoteVideo && !!remote && isTrackReference(remote);
+  const barsVisible = controlsShown || !showingVideo;
+  // A shared screen sits *between* the bars while they're visible, so its
+  // top and bottom are never hidden behind them.
+  const videoStyle = sharing && barsVisible ? styles.betweenBars : StyleSheet.absoluteFill;
+
   return (
     <View style={styles.activeScreen}>
-      {isVideo && remoteVideo && remote && isTrackReference(remote) ? (
-        // 'contain' for screens so documents aren't cropped; 'cover' for faces.
-        <VideoTrack trackRef={remote} style={StyleSheet.absoluteFill} objectFit={sharing ? 'contain' : 'cover'} />
+      {showingVideo && remote && isTrackReference(remote) ? (
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setControlsShown((v) => !v)}>
+          {/* 'contain' for screens so documents aren't cropped; 'cover' for faces. */}
+          <VideoTrack trackRef={remote} style={videoStyle} objectFit={sharing ? 'contain' : 'cover'} />
+        </Pressable>
       ) : (
         <SafeAreaView style={styles.screen}>
           <CallerHeader state={state} subtitle={status} />
         </SafeAreaView>
       )}
 
-      {isVideo && remoteVideo && (
+      {showingVideo && barsVisible && (
         <SafeAreaView style={styles.videoTopBar} edges={['top']}>
           <Text style={styles.videoName}>{state.peer.name}</Text>
           <Text style={styles.videoTimer}>{sharing ? `${timer} · sharing their screen` : status}</Text>
@@ -221,9 +232,16 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
       )}
 
       {isVideo && local && isTrackReference(local) && isCameraEnabled && (
-        <VideoTrack trackRef={local} style={styles.selfView} objectFit="cover" mirror={frontCamera} />
+        <VideoTrack trackRef={local} style={sharing ? { ...styles.selfView, ...styles.selfViewSmall } : styles.selfView} objectFit="cover" mirror={frontCamera} />
       )}
 
+      {!barsVisible && (
+        <View pointerEvents="none" style={styles.tapHint}>
+          <Text style={styles.tapHintText}>Tap to show controls</Text>
+        </View>
+      )}
+
+      {barsVisible && (
       <SafeAreaView style={styles.controlsBar} edges={['bottom']}>
         <View style={styles.controls}>
           <RoundButton size={50} icon={speaker ? 'volume-high' : 'volume-low'} color={speaker ? colors.secondary : OFF} onPress={() => setSpeaker((s) => !s)} />
@@ -243,6 +261,7 @@ function ActiveCallUI({ state }: { state: Extract<CallState, { phase: 'active' }
           <RoundButton size={50} icon="call" color={colors.danger} onPress={hangup} />
         </View>
       </SafeAreaView>
+      )}
 
       {chatOpen && <InCallChatPanel chat={chat} onClose={() => setChatOpen(false)} />}
     </View>
@@ -268,6 +287,10 @@ const styles = StyleSheet.create({
   selfView: { position: 'absolute', top: 110, right: 16, width: 110, height: 165, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   controlsBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17,27,33,0.85)', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   controls: { flexDirection: 'row', justifyContent: 'space-evenly', paddingVertical: 18 },
+  betweenBars: { position: 'absolute', left: 0, right: 0, top: 100, bottom: 110 },
+  selfViewSmall: { width: 80, height: 120, top: 104 },
+  tapHint: { position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14 },
+  tapHintText: { color: 'white', fontSize: 13 },
   badge: { position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: 'white', fontSize: 11, fontWeight: '700' },
 });

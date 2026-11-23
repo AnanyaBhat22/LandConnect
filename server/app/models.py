@@ -55,6 +55,7 @@ class MessageType(str, enum.Enum):
     TEXT = "TEXT"
     SYSTEM = "SYSTEM"
     CALL_LOG = "CALL_LOG"
+    IMAGE = "IMAGE"  # body = image URL. Stored as VARCHAR (non-native enum), so no migration was needed
 
 
 class CallKind(str, enum.Enum):

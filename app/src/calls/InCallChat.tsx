@@ -7,10 +7,11 @@
  * live in the Chats tab instead.
  */
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChat } from '@livekit/react-native';
 
+import { useKeyboardHeight } from '../lib/useKeyboardHeight';
 import { colors } from '../theme';
 
 /** Messages + unread count; lives in the call UI so nothing is lost while the panel is closed. */
@@ -28,6 +29,7 @@ type Chat = ReturnType<typeof useInCallChat>;
 export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => void }) {
   const [text, setText] = useState('');
   const listRef = useRef<FlatList>(null);
+  const keyboardHeight = useKeyboardHeight();
 
   const send = async () => {
     const msg = text.trim();
@@ -41,7 +43,8 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
   };
 
   return (
-    <KeyboardAvoidingView style={styles.wrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    // Lift the panel above the keyboard (edge-to-edge Android doesn't resize the window).
+    <View style={[styles.wrap, { paddingBottom: keyboardHeight }]}>
       <View style={styles.panel}>
         <View style={styles.header}>
           <Text style={styles.title}>Chat in call</Text>
@@ -82,7 +85,7 @@ export function InCallChatPanel({ chat, onClose }: { chat: Chat; onClose: () => 
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

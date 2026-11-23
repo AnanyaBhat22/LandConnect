@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { api, uploadFile } from '../../api/client';
 import type { Listing, ListingImage, ListingInput } from '../../api/types';
 import { LocationPicker, type PickedPlace } from '../../components/LocationPicker';
+import { useKeyboardHeight } from '../../lib/useKeyboardHeight';
 import { Button, TextField } from '../../components/ui';
 import { colors } from '../../theme';
 
@@ -27,6 +28,7 @@ export default function EditListingScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = !!id;
   const insets = useSafeAreaInsets(); // room for Android's nav bar below the Save button
+  const keyboardHeight = useKeyboardHeight(); // so the last fields can scroll above the keyboard
 
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
@@ -164,7 +166,7 @@ export default function EditListingScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ title: editing ? 'Edit listing' : 'List your land' }} />
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 48 + insets.bottom }]} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 48 + Math.max(insets.bottom, keyboardHeight) }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.section}>Photos</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
           {existing.map((img) => (

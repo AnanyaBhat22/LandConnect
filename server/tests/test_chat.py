@@ -130,3 +130,48 @@ def test_finished_call_appears_in_chat(client, session_factory, pushes):
     log = json.loads(msgs[-1]["body"])
     assert log == {"kind": "VIDEO", "status": "MISSED", "caller_id": str(a), "duration": None}
     assert {uid for e, _, uid in emitted if e == "message:new"} == {a, r}
+
+
+def test_send_picture(client, pushes, monkeypatch):
+    from app.services import images as image_store
+
+    monkeypatch.setattr(image_store, "upload_chat_image", lambda data, cid: image_store.StoredImage(url="https://img.test/chat.jpg", public_id="c1"))
+    asha = register(client, email="asha@example.com")
+    ravi = register(client, email="ravi@example.com", role="SELLER")
+    eve = register(client, email="eve@example.com")
+    conv = start(client, asha, ravi["user"]["id"])
+    url = f"/conversations/{conv['id']}/images"
+    photo = {"file": ("plot.jpg", b"\xff\xd8fake", "image/jpeg")}
+
+    res = client.post(url, files=photo, headers=auth_header(asha))
+    assert res.status_code == 201
+    assert res.json()["type"] == "IMAGE" and res.json()["body"] == "https://img.test/chat.jpg"
+    assert any(e == "message:new" and d["type"] == "IMAGE" and uid == ravi["user"]["id"] for e, d, uid in pushes)
+    assert client.post(url, files={"file": ("a.pdf", b"%PDF", "application/pdf")}, headers=auth_header(asha)).status_code == 415
+    assert client.post(url, files=photo, headers=auth_header(eve)).status_code == 404  # not a member
+
+
+def test_room_closed_only_after_answered_call(client, session_factory, pushes):
+    asha = register(client, email="asha@example.com")
+    ravi = register(client, email="ravi@example.com", role="SELLER")
+    a, r = uuid.UUID(asha["user"]["id"]), uuid.UUID(ravi["user"]["id"])
+    closed: list[str] = []
+
+    async def close_room(room):
+        closed.append(room)
+
+    async def emit(*_):
+        pass
+
+    async def scenario():
+        mgr = CallManager(emit=emit, session_factory=session_factory, is_online=lambda u: True, close_room=close_room)
+        rejected = (await mgr.invite(a, r, CallKind.AUDIO))["call_id"]
+        await mgr.reject(r, uuid.UUID(rejected))
+        answered = (await mgr.invite(a, r, CallKind.VIDEO))["call_id"]
+        await mgr.accept(r, uuid.UUID(answered))
+        await mgr.hangup(a, uuid.UUID(answered))
+        await asyncio.sleep(0.05)
+        return answered
+
+    answered = asyncio.run(scenario())
+    assert closed == [f"call_{answered}"]  # no room existed for the rejected call
