@@ -5,7 +5,7 @@ A land marketplace mobile app (Android) for **buyers, sellers and brokers**. Bro
 Built as a technical assignment prototype.
 
 ## Try it
-- **APK:** _link to be added_ (Android 8+; allow "install unknown apps")
+- **APK:** [download from Expo](https://expo.dev/accounts/meadowmaven/projects/landconnect/builds/464f4c02-a29a-400a-acc7-4e5cd77f820e) (Android 8+; allow "install unknown apps")
 - **Hosted API:** https://landconnect-api-0zf4.onrender.com (`/health` returns `{"status":"ok"}`, `/docs` shows the interactive API)
 - **Demo accounts** (password `demo1234`): `asha@example.com` (Buyer), `ravi@example.com` (Seller), `meera@example.com` (Broker)
 
